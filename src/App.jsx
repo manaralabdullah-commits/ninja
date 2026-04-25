@@ -2,6 +2,10 @@ import { useState, useEffect, useRef } from "react";
 
 // ── APPS SCRIPT API ────────────────────────────────────────────────────────────
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw5YxNHGXX7S-1USNXogzhEeBRQwjQCtqcfFx0fr28npYnWIXjy9LIcCHOOopeWa7PL/exec";
+// Use local Netlify proxy to avoid CORS
+const API_BASE = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+  ? "/.netlify/functions/proxy"
+  : APPS_SCRIPT_URL;
 
 async function callAPI(func, payload) {
   try {
@@ -348,16 +352,14 @@ export default function App() {
   }, [data]);
 
   async function fetchSheetData() {
-    // Works in both Apps Script and Netlify
     if (typeof google !== 'undefined' && google.script) {
-      // Inside Apps Script — use google.script.run
+      // Inside Apps Script
       google.script.run
         .withSuccessHandler(function(json) {
           try {
             const res = JSON.parse(json);
             if (!res.ok) { setSheetLoading(false); return; }
             const projects = res.projects.filter(p => p.id && p.name);
-            console.log("✅ Apps Script:", projects.length, "projects");
             setSheetData(d => ({ ...(d || STATIC_DATA), projects }));
             setLastRefresh(new Date());
             setSheetLoading(false);
@@ -366,24 +368,23 @@ export default function App() {
         .withFailureHandler(() => setSheetLoading(false))
         .getProjectsData();
     } else {
-      // Outside Apps Script (Netlify) — use CORS proxy
+      // Netlify — use local proxy function
       try {
-        const PROXY = "https://corsproxy.io/?";
-        const url   = PROXY + encodeURIComponent(APPS_SCRIPT_URL + "?func=getProjectsData");
-        const res   = await fetch(url);
-        const data  = await res.json();
+        const url  = `${API_BASE}?func=getProjectsData`;
+        const res  = await fetch(url);
+        const data = await res.json();
         if (data.ok && data.projects?.length) {
           const projects = data.projects.filter(p => p.id && p.name);
-          console.log("✅ Netlify+Proxy:", projects.length, "projects");
+          console.log("✅ Loaded", projects.length, "projects");
           setSheetData(d => ({ ...(d || STATIC_DATA), projects }));
           setSheetLoading(false);
           setLastRefresh(new Date());
         } else {
-          console.warn("⚠ No projects returned");
+          console.warn("⚠ No projects:", data.error||"");
           setSheetLoading(false);
         }
       } catch(e) {
-        console.error("⚠ Fetch failed:", e.message);
+        console.error("⚠ Error:", e.message);
         setSheetLoading(false);
       }
     }
@@ -527,11 +528,14 @@ export default function App() {
   const S = {
     app: {
       minHeight: "100vh",
+      height: "100vh",
+      width: "100vw",
       background: "#060E1A",
       color: "#E2E8F0",
       fontFamily: "'DM Sans', 'Outfit', system-ui, sans-serif",
       display: "flex",
-      position: "relative",
+      position: "fixed",
+      inset: 0,
       overflow: "hidden",
     },
     bg: {
@@ -2086,9 +2090,14 @@ export default function App() {
         position:"relative", overflow:"hidden",
       }}>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800;900&display=swap');
-          @keyframes fadeIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
-        `}</style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800;9..40,900&family=Nunito:ital,wght@1,900&display=swap');
+        html, body, #root { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+        * { box-sizing: border-box; }
+        button, input, textarea, select { font-family: inherit; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+      `}</style>
         <div style={{ position:"absolute", inset:0, pointerEvents:"none",
           background:"radial-gradient(ellipse 70% 50% at 20% 10%, rgba(0,194,212,0.09) 0%, transparent 55%), radial-gradient(ellipse 50% 40% at 80% 85%, rgba(124,58,237,0.08) 0%, transparent 55%)" }}/>
 
