@@ -347,40 +347,45 @@ export default function App() {
     }
   }, [data]);
 
-  function fetchSheetData() {
+  async function fetchSheetData() {
+    // Works in both Apps Script and Netlify
     if (typeof google !== 'undefined' && google.script) {
-      // ✅ Running inside Apps Script — reads LIVE from Google Sheet
+      // Inside Apps Script — use google.script.run
       google.script.run
         .withSuccessHandler(function(json) {
           try {
             const res = JSON.parse(json);
-            if (!res.ok) {
-              console.error("❌ Sheet error:", res.error);
-              setSheetLoading(false);
-              return;
-            }
+            if (!res.ok) { setSheetLoading(false); return; }
             const projects = res.projects.filter(p => p.id && p.name);
-            console.log("✅ LIVE from Google Sheet:", projects.length, "projects");
-            console.table(projects.map(p => ({id:p.id, name:p.name, status:p.status, progress:p.progress})));
+            console.log("✅ Apps Script:", projects.length, "projects");
             setSheetData(d => ({ ...(d || STATIC_DATA), projects }));
             setLastRefresh(new Date());
             setSheetLoading(false);
-          } catch(e) {
-            console.error("❌ Parse error:", e);
-            setSheetLoading(false);
-          }
+          } catch(e) { setSheetLoading(false); }
         })
-        .withFailureHandler(function(e) {
-          console.error("❌ Apps Script call failed:", e);
-          setSheetLoading(false);
-        })
+        .withFailureHandler(() => setSheetLoading(false))
         .getProjectsData();
     } else {
-      // ⚠️ Not in Apps Script (local test) — no hardcoded data loaded
-      console.warn("⚠️ Not running in Apps Script. No project data will be shown.");
-      console.warn("⚠️ Deploy to Apps Script to load real data from Google Sheet.");
-      setSheetLoading(false);
-      setLastRefresh(new Date());
+      // Outside Apps Script (Netlify) — use CORS proxy
+      try {
+        const PROXY = "https://corsproxy.io/?";
+        const url   = PROXY + encodeURIComponent(APPS_SCRIPT_URL + "?func=getProjectsData");
+        const res   = await fetch(url);
+        const data  = await res.json();
+        if (data.ok && data.projects?.length) {
+          const projects = data.projects.filter(p => p.id && p.name);
+          console.log("✅ Netlify+Proxy:", projects.length, "projects");
+          setSheetData(d => ({ ...(d || STATIC_DATA), projects }));
+          setSheetLoading(false);
+          setLastRefresh(new Date());
+        } else {
+          console.warn("⚠ No projects returned");
+          setSheetLoading(false);
+        }
+      } catch(e) {
+        console.error("⚠ Fetch failed:", e.message);
+        setSheetLoading(false);
+      }
     }
   }
 
