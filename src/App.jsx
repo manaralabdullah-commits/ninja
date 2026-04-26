@@ -567,7 +567,7 @@ export default function App() {
       minHeight: "100vh",
       height: "100vh",
       width: "100vw",
-      background: "#060E1A",
+      background: "#0B1220",
       color: "#E2E8F0",
       fontFamily: "'DM Sans', 'Outfit', system-ui, sans-serif",
       display: "flex",
@@ -804,177 +804,173 @@ export default function App() {
     const map        = PRIMARY_KPI[proj.id];
     const kpiObj     = map ? data.kpis.find(k => k.id === map.kpi) : null;
     const calcProg   = getKPIProgress(proj.id) ?? proj.progress ?? 0;
-    const priCfg     = { Critical:"#EF4444", High:"#F59E0B", Medium:"#00C2D4", Low:"#10B981" }[proj.priority] || "#64748B";
+    const priCfg     = { Critical:"#EF4444", High:"#F59E0B", Medium:"#22C1C3", Low:"#22C55E" }[proj.priority] || "#64748B";
     const stCfg      = getProjStatusConfig(proj.status);
     const [alertSent, setAlertSent] = useState(false);
     const [showPhases, setShowPhases] = useState(false);
+    const [editingKPI, setEditingKPI] = useState(false);
     const phases = getProjectPhases(proj);
 
     function fmtDate(d) {
-      if (!d) return "";
+      if (!d) return "—";
       try { return new Date(d).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}); }
       catch { return d; }
     }
 
     const initials = (proj.lead||"?").split(" ").filter(Boolean).slice(0,2).map(w=>w[0]).join("");
 
-    // Progress color
-    const progColor = calcProg >= 70 ? "#10B981" : calcProg >= 40 ? "#F59E0B" : "#EF4444";
+    // Color based on progress
+    const progColor = calcProg >= 70 ? "#22C55E" : calcProg >= 40 ? "#F59E0B" : "#EF4444";
+    const progBg    = calcProg >= 70 ? "rgba(34,197,94,0.07)" : calcProg >= 40 ? "rgba(245,158,11,0.07)" : "rgba(239,68,68,0.07)";
+
+    // Current phase
+    const currentPhase = phases.findIndex(p => p.status === "In Progress");
 
     return (
       <div style={{
-        background:"#0D1626",
-        borderRadius:20,
-        border:`1px solid rgba(255,255,255,0.06)`,
-        boxShadow:"0 4px 24px rgba(0,0,0,0.3)",
+        background:"#111827",
+        borderRadius:16,
+        border:"1px solid rgba(255,255,255,0.06)",
+        boxShadow:"0 2px 16px rgba(0,0,0,0.25)",
         overflow:"hidden",
         fontFamily:"'DM Sans',system-ui,sans-serif",
         transition:"transform 0.15s,box-shadow 0.15s",
       }}
-      onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 32px rgba(0,0,0,0.4)";}}
-      onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 4px 24px rgba(0,0,0,0.3)";}}
+      onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 28px rgba(0,0,0,0.35)";}}
+      onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 2px 16px rgba(0,0,0,0.25)";}}
       >
-        {/* ── Top accent bar ── */}
-        <div style={{ height:3, background:`linear-gradient(90deg,${progColor},${progColor}40)` }}/>
+        {/* Top accent line */}
+        <div style={{ height:2, background:`linear-gradient(90deg,${progColor},transparent)` }}/>
 
-        <div style={{ padding:"16px 18px" }}>
+        <div style={{ padding:"20px 20px 18px" }}>
 
           {/* ── Row 1: ID + Priority + Status ── */}
-          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12 }}>
-            <div style={{ display:"flex",alignItems:"center",gap:6 }}>
-              <span style={{ fontSize:14 }}>{dept?.icon}</span>
-              <span style={{ fontSize:9,color:"#475569",fontWeight:700,letterSpacing:0.5 }}>{proj.id}</span>
+          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14 }}>
+            <div style={{ display:"flex",alignItems:"center",gap:7 }}>
+              <span style={{ fontSize:8,color:"#475569",fontWeight:700,letterSpacing:0.8 }}>{proj.id}</span>
               <span style={{ fontSize:9,fontWeight:700,color:priCfg,
-                background:`${priCfg}15`,borderRadius:99,padding:"2px 8px" }}>
+                background:`${priCfg}12`,borderRadius:6,padding:"2px 8px" }}>
                 {proj.priority}
               </span>
             </div>
             <div style={{ display:"flex",alignItems:"center",gap:5,
-              background:`${stCfg.color}12`,borderRadius:99,
-              padding:"4px 10px",border:`1px solid ${stCfg.color}25` }}>
-              <div style={{ width:6,height:6,borderRadius:"50%",
-                background:stCfg.color,boxShadow:`0 0 5px ${stCfg.color}` }}/>
-              <span style={{ fontSize:10,fontWeight:700,color:stCfg.color }}>{proj.status}</span>
+              background:`${stCfg.color}10`,borderRadius:8,
+              padding:"4px 10px",border:`1px solid ${stCfg.color}20` }}>
+              <div style={{ width:5,height:5,borderRadius:"50%",background:stCfg.color }}/>
+              <span style={{ fontSize:10,fontWeight:600,color:stCfg.color }}>{proj.status}</span>
             </div>
           </div>
 
           {/* ── Row 2: Title ── */}
-          <div style={{ fontSize:13,fontWeight:800,color:"#F1F5F9",
-            lineHeight:1.3,marginBottom:14,letterSpacing:-0.3 }}>
+          <div style={{ fontSize:14,fontWeight:800,color:"#F1F5F9",
+            lineHeight:1.3,marginBottom:16,letterSpacing:-0.3 }}>
             {proj.name}
           </div>
 
-          {/* ── Row 3: Progress (most prominent) ── */}
-          <div style={{ background:`${progColor}08`,borderRadius:14,
-            padding:"14px 16px",marginBottom:14,
-            border:`1px solid ${progColor}20` }}>
-            <div style={{ display:"flex",justifyContent:"space-between",
-              alignItems:"center",marginBottom:10 }}>
-              <div>
-                <div style={{ fontSize:9,color:"#475569",fontWeight:600,
-                  textTransform:"uppercase",letterSpacing:0.8,marginBottom:4 }}>
-                  Project Progress
-                </div>
-                <div style={{ fontSize:36,fontWeight:900,color:progColor,
-                  lineHeight:1,letterSpacing:-1 }}>
-                  {calcProg}<span style={{ fontSize:20 }}>%</span>
-                </div>
-              </div>
-              {/* Circular progress indicator */}
-              <svg width="56" height="56" viewBox="0 0 56 56">
-                <circle cx="28" cy="28" r="22" fill="none"
-                  stroke="rgba(255,255,255,0.06)" strokeWidth="5"/>
-                <circle cx="28" cy="28" r="22" fill="none"
-                  stroke={progColor} strokeWidth="5"
-                  strokeDasharray={`${2*Math.PI*22}`}
-                  strokeDashoffset={`${2*Math.PI*22*(1-calcProg/100)}`}
-                  strokeLinecap="round"
-                  transform="rotate(-90 28 28)"
-                  style={{ transition:"stroke-dashoffset 1s ease" }}/>
-                <text x="28" y="33" textAnchor="middle"
-                  fontSize="11" fontWeight="800" fill={progColor}>
-                  {calcProg}%
-                </text>
-              </svg>
+          {/* ── Row 3: Owner ── */}
+          <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:16,
+            padding:"10px 12px",
+            background:"rgba(255,255,255,0.03)",
+            borderRadius:10,border:"1px solid rgba(255,255,255,0.05)" }}>
+            <div style={{ width:28,height:28,borderRadius:"50%",flexShrink:0,
+              background:`${dept?.color||"#22C1C3"}15`,
+              border:`1.5px solid ${dept?.color||"#22C1C3"}30`,
+              display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:10,fontWeight:800,color:dept?.color||"#22C1C3" }}>
+              {initials||"?"}
             </div>
-            {/* Progress bar */}
-            <div style={{ height:5,borderRadius:99,
-              background:"rgba(255,255,255,0.06)",overflow:"hidden" }}>
-              <div style={{ width:`${calcProg}%`,height:"100%",borderRadius:99,
-                background:`linear-gradient(90deg,${progColor}80,${progColor})`,
-                transition:"width 1s ease" }}/>
-            </div>
-          </div>
-
-          {/* ── Row 4: Owner + Dates (side by side) ── */}
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14 }}>
-            {/* Owner */}
-            <div style={{ background:"rgba(255,255,255,0.03)",borderRadius:10,
-              padding:"8px 10px",border:"1px solid rgba(255,255,255,0.05)",
-              display:"flex",alignItems:"center",gap:8 }}>
-              <div style={{ width:26,height:26,borderRadius:"50%",flexShrink:0,
-                background:`${dept?.color||"#64748B"}20`,
-                border:`1.5px solid ${dept?.color||"#64748B"}40`,
-                display:"flex",alignItems:"center",justifyContent:"center",
-                fontSize:9,fontWeight:800,color:dept?.color||"#64748B" }}>
-                {initials}
+            <div style={{ minWidth:0 }}>
+              <div style={{ fontSize:11,fontWeight:600,color:"#CBD5E1",
+                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
+                {proj.lead||"Not assigned"}
               </div>
-              <div style={{ minWidth:0 }}>
-                <div style={{ fontSize:10,fontWeight:700,color:"#CBD5E1",
-                  overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
-                  {proj.lead || "—"}
-                </div>
-                <div style={{ fontSize:8,color:"#475569",
-                  overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
-                  {proj.email || ""}
-                </div>
+              <div style={{ fontSize:9,color:"#475569",
+                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
+                {proj.email||""}
               </div>
             </div>
-            {/* Dates */}
-            <div style={{ background:"rgba(255,255,255,0.03)",borderRadius:10,
-              padding:"8px 10px",border:`1px solid ${days!==null&&days<0?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.05)"}` }}>
-              <div style={{ fontSize:8,color:"#475569",fontWeight:600,
-                textTransform:"uppercase",letterSpacing:0.6,marginBottom:3 }}>Timeline</div>
-              <div style={{ fontSize:10,fontWeight:600,color:"#94A3B8",lineHeight:1.4 }}>
-                {fmtDate(proj.startDate)}
-              </div>
-              <div style={{ fontSize:10,fontWeight:600,
-                color:days!==null&&days<0?"#EF4444":"#94A3B8",lineHeight:1.4 }}>
+            {/* Dates on right */}
+            <div style={{ marginLeft:"auto",textAlign:"right",flexShrink:0 }}>
+              <div style={{ fontSize:9,color:"#64748B" }}>{fmtDate(proj.startDate)}</div>
+              <div style={{ fontSize:9,fontWeight:600,
+                color:days!==null&&days<0?"#EF4444":"#64748B" }}>
                 → {fmtDate(proj.endDate)}
               </div>
-              {days !== null && (
-                <div style={{ fontSize:9,fontWeight:700,marginTop:2,
-                  color:days<0?"#EF4444":days<14?"#F59E0B":"#10B981" }}>
-                  {days<0?`${Math.abs(days)}d overdue`:`${days}d left`}
+              {days!==null && (
+                <div style={{ fontSize:9,fontWeight:700,
+                  color:days<0?"#EF4444":days<14?"#F59E0B":"#22C55E" }}>
+                  {days<0?`${Math.abs(days)}d late`:`${days}d left`}
                 </div>
               )}
             </div>
           </div>
 
-          {/* ── Row 5: Primary KPI ── */}
+          {/* ── Row 4: Progress bar (horizontal, clean) ── */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ display:"flex",justifyContent:"space-between",
+              alignItems:"center",marginBottom:6 }}>
+              <span style={{ fontSize:10,fontWeight:700,color:"#94A3B8" }}>Progress</span>
+              <span style={{ fontSize:16,fontWeight:900,color:progColor }}>{calcProg}%</span>
+            </div>
+            <div style={{ height:6,borderRadius:99,
+              background:"rgba(255,255,255,0.06)",overflow:"hidden" }}>
+              <div style={{ width:`${calcProg}%`,height:"100%",borderRadius:99,
+                background:progColor,
+                transition:"width 1s ease" }}/>
+            </div>
+          </div>
+
+          {/* ── Row 5: Phase tracker ── */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ display:"flex",gap:4 }}>
+              {phases.map((ph,i)=>{
+                const isDone   = ph.status==="Completed";
+                const isActive = ph.status==="In Progress";
+                return (
+                  <div key={i} style={{ flex:1, textAlign:"center" }}>
+                    <div style={{ height:3,borderRadius:99,marginBottom:4,
+                      background: isDone ? "#22C55E" : isActive ? "#22C1C3" : "rgba(255,255,255,0.08)",
+                      boxShadow: isActive ? "0 0 6px #22C1C330" : "none",
+                      transition:"background 0.3s" }}/>
+                    <div style={{ fontSize:7,fontWeight:600,letterSpacing:0.3,
+                      color: isDone?"#22C55E":isActive?"#22C1C3":"#334155" }}>
+                      {ph.name.split(" ")[0]}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Row 6: KPI section ── */}
           {kpiObj && map && (
-            <div style={{ background:"rgba(255,255,255,0.03)",borderRadius:10,
-              padding:"10px 12px",marginBottom:14,
-              border:"1px solid rgba(255,255,255,0.05)" }}>
-              <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+            <div style={{ background:progBg,borderRadius:10,
+              padding:"12px 14px",marginBottom:16,
+              border:`1px solid ${progColor}15` }}>
+              <div style={{ display:"flex",justifyContent:"space-between",
+                alignItems:"flex-start" }}>
                 <div>
                   <div style={{ fontSize:8,color:"#475569",fontWeight:600,
-                    textTransform:"uppercase",letterSpacing:0.6,marginBottom:3 }}>
+                    textTransform:"uppercase",letterSpacing:0.8,marginBottom:5 }}>
                     {kpiObj.name}
                   </div>
-                  <div style={{ display:"flex",alignItems:"baseline",gap:6 }}>
-                    <span style={{ fontSize:18,fontWeight:800,color:progColor }}>
+                  <div style={{ display:"flex",alignItems:"baseline",gap:5 }}>
+                    <span style={{ fontSize:22,fontWeight:900,color:progColor,lineHeight:1 }}>
                       {getKPIActual(map?.kpi, proj.id) ?? "—"}
                     </span>
                     <span style={{ fontSize:11,color:"#475569" }}>{map?.unit}</span>
+                    {/* Edit icon */}
+                    <span onClick={e=>{e.stopPropagation();setEditingActual(editingActual===proj.id?null:proj.id);}}
+                      style={{ fontSize:11,color:"#22C1C3",cursor:"pointer",
+                        marginLeft:4,opacity:0.7 }}>✏</span>
                   </div>
                 </div>
                 <div style={{ textAlign:"right" }}>
                   <div style={{ fontSize:8,color:"#475569",marginBottom:3 }}>Target</div>
-                  <div style={{ fontSize:14,fontWeight:700,color:"#64748B" }}>
+                  <div style={{ fontSize:13,fontWeight:700,color:"#64748B" }}>
                     {getKPITarget(map?.kpi, proj.id) ?? map?.target ?? "—"} {map?.unit}
                   </div>
-                  <div style={{ fontSize:8,color:"#475569",marginTop:2 }}>
+                  <div style={{ fontSize:8,color:"#475569",marginTop:3 }}>
                     Base: {getKPIBaseline(map?.kpi, proj.id) ?? map?.baseline ?? "—"}
                   </div>
                 </div>
@@ -982,46 +978,28 @@ export default function App() {
             </div>
           )}
 
-          {/* ── Row 6: KPI tags ── */}
-          {linkedKPIs.length > 0 && (
-            <div style={{ display:"flex",flexWrap:"wrap",gap:4,marginBottom:14 }}>
-              {linkedKPIs.slice(0,4).map(k=>(
-                <span key={k.id} style={{ fontSize:9,fontWeight:600,color:"#00C2D4",
-                  background:"rgba(0,194,212,0.08)",border:"1px solid rgba(0,194,212,0.15)",
-                  borderRadius:99,padding:"2px 8px" }}>
-                  {k.name}
-                </span>
-              ))}
-              {linkedKPIs.length>4 && (
-                <span style={{ fontSize:9,color:"#475569" }}>+{linkedKPIs.length-4} more</span>
-              )}
-            </div>
-          )}
-
-          {/* ── Row 7: Update KPI Actual ── */}
-          {editingActual === proj.id ? (
-            <div style={{ background:"rgba(0,194,212,0.06)",borderRadius:10,
-              padding:"10px 12px",marginBottom:14,
-              border:"1px solid rgba(0,194,212,0.2)" }}
+          {/* ── Row 7: Inline KPI edit ── */}
+          {editingActual === proj.id && (
+            <div style={{ background:"rgba(34,193,195,0.06)",borderRadius:10,
+              padding:"12px 14px",marginBottom:16,
+              border:"1px solid rgba(34,193,195,0.2)" }}
               onClick={e=>e.stopPropagation()}>
-              <div style={{ fontSize:9,color:"#00C2D4",fontWeight:700,
-                marginBottom:8 }}>✏ Update KPI Actual — syncs to Sheet</div>
+              <div style={{ fontSize:9,color:"#22C1C3",fontWeight:700,marginBottom:8 }}>
+                Update KPI Actual — syncs to Sheet
+              </div>
               {linkedKPIs.map(k => {
                 const [val, setVal] = useState(k.actual !== undefined ? String(k.actual) : "");
                 return (
-                  <div key={k.id} style={{ display:"flex",alignItems:"center",
-                    gap:6,marginBottom:6 }}>
+                  <div key={k.id} style={{ display:"flex",alignItems:"center",gap:6,marginBottom:6 }}>
                     <span style={{ fontSize:9,color:"#94A3B8",flex:1,
-                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
-                      {k.name}
-                    </span>
-                    <span style={{ fontSize:9,color:"#10B981",
-                      background:"rgba(16,185,129,0.1)",borderRadius:99,
+                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{k.name}</span>
+                    <span style={{ fontSize:9,color:"#22C55E",
+                      background:"rgba(34,197,94,0.1)",borderRadius:99,
                       padding:"1px 6px",whiteSpace:"nowrap" }}>T:{k.q1}</span>
                     <input value={val} onChange={e=>setVal(e.target.value)}
                       placeholder="Actual"
-                      style={{ width:60,background:"rgba(0,194,212,0.08)",
-                        border:"1px solid #00C2D4",borderRadius:6,
+                      style={{ width:60,background:"rgba(34,193,195,0.08)",
+                        border:"1px solid #22C1C3",borderRadius:6,
                         padding:"3px 7px",color:"#E2E8F0",
                         fontSize:10,fontFamily:"inherit",outline:"none",textAlign:"center" }}/>
                     <button onClick={async()=>{
@@ -1033,112 +1011,62 @@ export default function App() {
                         const d2 = await res.json();
                         if (d2.ok) { k.actual=parseFloat(val)||val; setEditingActual(null); }
                       } catch(e) { console.error(e); }
-                    }} style={{ background:"#10B981",color:"#fff",border:"none",
+                    }} style={{ background:"#22C55E",color:"#fff",border:"none",
                       borderRadius:6,padding:"3px 8px",fontSize:9,
-                      fontWeight:700,cursor:"pointer" }}>Save ✓</button>
+                      fontWeight:700,cursor:"pointer",whiteSpace:"nowrap" }}>Save</button>
                   </div>
                 );
               })}
               <button onClick={e=>{e.stopPropagation();setEditingActual(null);}}
                 style={{ width:"100%",background:"rgba(255,255,255,0.04)",border:"none",
                   borderRadius:6,padding:"5px 0",fontSize:9,color:"#64748B",
-                  cursor:"pointer",marginTop:4 }}>Cancel</button>
+                  cursor:"pointer",marginTop:4,fontFamily:"inherit" }}>Cancel</button>
             </div>
-          ) : (
-            <button onClick={e=>{e.stopPropagation();setEditingActual(proj.id);}}
-              style={{ width:"100%",background:"rgba(0,194,212,0.06)",color:"#00C2D4",
-                border:"1px solid rgba(0,194,212,0.15)",borderRadius:10,
-                padding:"7px 0",fontSize:10,fontWeight:700,
-                cursor:"pointer",marginBottom:14,fontFamily:"inherit" }}>
-              ✏ Update KPI Actual
-            </button>
           )}
 
-          {/* ── Row 8: Phases expand ── */}
-          {(()=>{
-            const doneCount = phases.filter(p=>p.status==="Completed").length;
-            return (
-              <>
-                {showPhases && (
-                  <div style={{ marginBottom:14,padding:"10px 12px",
-                    background:"rgba(124,58,237,0.06)",borderRadius:10,
-                    border:"1px solid rgba(124,58,237,0.15)" }}
-                    onClick={e=>e.stopPropagation()}>
-                    {phases.map((ph,i)=>{
-                      const isDone=ph.status==="Completed";
-                      const isActive=ph.status==="In Progress";
-                      const c=isDone?"#10B981":isActive?"#00C2D4":"#334155";
-                      return (
-                        <div key={i} style={{ marginBottom:i<3?10:0 }}>
-                          <div style={{ display:"flex",justifyContent:"space-between",
-                            alignItems:"center",marginBottom:4 }}>
-                            <div style={{ display:"flex",alignItems:"center",gap:5 }}>
-                              <span>{ph.icon}</span>
-                              <span style={{ fontSize:10,fontWeight:700,color:c }}>
-                                {ph.name}
-                              </span>
-                              <span style={{ fontSize:8,color:c,
-                                background:`${c}15`,borderRadius:99,padding:"1px 5px" }}>
-                                {ph.status}
-                              </span>
-                            </div>
-                            <span style={{ fontSize:10,fontWeight:800,color:c }}>{ph.progress}%</span>
-                          </div>
-                          <div style={{ height:4,borderRadius:99,
-                            background:"rgba(255,255,255,0.06)",overflow:"hidden" }}>
-                            <div style={{ width:`${ph.progress}%`,height:"100%",
-                              background:c,borderRadius:99,transition:"width 0.8s" }}/>
-                          </div>
-                          <div style={{ fontSize:8,color:"#334155",marginTop:2 }}>
-                            {ph.startDate} → {ph.endDate}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            );
-          })()}
+          {/* ── Row 8: KPI tags ── */}
+          {linkedKPIs.length > 0 && (
+            <div style={{ display:"flex",flexWrap:"wrap",gap:4,marginBottom:16 }}>
+              {linkedKPIs.slice(0,3).map(k=>(
+                <span key={k.id} style={{ fontSize:9,fontWeight:600,color:"#22C1C3",
+                  background:"rgba(34,193,195,0.07)",border:"1px solid rgba(34,193,195,0.12)",
+                  borderRadius:6,padding:"2px 8px" }}>
+                  {k.name}
+                </span>
+              ))}
+              {linkedKPIs.length>3 && (
+                <span style={{ fontSize:9,color:"#475569" }}>+{linkedKPIs.length-3}</span>
+              )}
+            </div>
+          )}
 
           {/* ── Row 9: Action buttons ── */}
-          <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
+          <div style={{ display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",
+            paddingTop:14,borderTop:"1px solid rgba(255,255,255,0.05)" }}>
             {proj.trello && (
               <a href={proj.trello} target="_blank" rel="noreferrer"
                 onClick={e=>e.stopPropagation()}
-                style={{ fontSize:9,color:"#00C2D4",textDecoration:"none",
-                  background:"rgba(0,194,212,0.08)",border:"1px solid rgba(0,194,212,0.2)",
-                  borderRadius:8,padding:"5px 10px",fontWeight:700 }}>
-                🔗 Trello
+                style={{ fontSize:9,color:"#38BDF8",textDecoration:"none",
+                  background:"rgba(56,189,248,0.07)",border:"1px solid rgba(56,189,248,0.15)",
+                  borderRadius:7,padding:"5px 10px",fontWeight:600 }}>
+                Trello ↗
               </a>
             )}
-            <button onClick={e=>{e.stopPropagation();setShowPhases(v=>!v);}}
-              style={{ fontSize:9,color:"#7C3AED",fontWeight:700,
-                background:showPhases?"rgba(124,58,237,0.2)":"rgba(124,58,237,0.08)",
-                border:"1px solid rgba(124,58,237,0.2)",borderRadius:8,
-                padding:"5px 10px",cursor:"pointer",
-                display:"flex",alignItems:"center",gap:4 }}>
-              📋 Phases
-              <span style={{ background:"rgba(124,58,237,0.3)",borderRadius:99,
-                padding:"0px 5px",fontSize:8 }}>
-                {phases.filter(p=>p.status==="Completed").length}/4
-              </span>
-            </button>
             <button onClick={e=>{e.stopPropagation();setDocsModal(proj.id);}}
-              style={{ fontSize:9,color:"#F59E0B",fontWeight:700,
-                background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.2)",
-                borderRadius:8,padding:"5px 10px",cursor:"pointer" }}>
-              📁 Docs
+              style={{ fontSize:9,color:"#94A3B8",fontWeight:600,
+                background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
+                borderRadius:7,padding:"5px 10px",cursor:"pointer",fontFamily:"inherit" }}>
+              Docs
             </button>
             {currentUser?.role==="executive" && (alert==="overdue"||alert==="atrisk") && proj.email && (
               <button onClick={e=>{e.stopPropagation();setAlertSent(true);
                 setTimeout(()=>setAlertSent(false),3000);setAlertModal(proj);}}
                 style={{ marginLeft:"auto",fontSize:9,fontWeight:700,
-                  background:alertSent?"rgba(16,185,129,0.15)":"#EF4444",
-                  color:alertSent?"#10B981":"#fff",
-                  border:"none",borderRadius:8,padding:"5px 12px",
-                  cursor:"pointer",transition:"all 0.2s" }}>
-                {alertSent?"✓ Sent":"📧 Alert"}
+                  background:alertSent?"rgba(34,197,94,0.15)":"rgba(239,68,68,0.9)",
+                  color:alertSent?"#22C55E":"#fff",
+                  border:"none",borderRadius:7,padding:"5px 14px",
+                  cursor:"pointer",fontFamily:"inherit",transition:"all 0.2s" }}>
+                {alertSent?"✓ Sent":"Send Alert"}
               </button>
             )}
           </div>
@@ -2311,7 +2239,7 @@ export default function App() {
 
     return (
       <div style={{
-        minHeight:"100vh", background:"#060E1A",
+        minHeight:"100vh", background:"#0B1220",
         display:"flex", alignItems:"center", justifyContent:"center",
         fontFamily:"'DM Sans',system-ui,sans-serif",
         position:"relative", overflow:"hidden",
@@ -2447,7 +2375,7 @@ export default function App() {
   if (!currentUser) return <LoginScreen />;
 
   if (sheetLoading && data.projects.length === 0) return (
-    <div style={{ minHeight:"100vh", background:"#060E1A", display:"flex",
+    <div style={{ minHeight:"100vh", background:"#0B1220", display:"flex",
       alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16,
       fontFamily:"'DM Sans',sans-serif" }}>
       <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontStyle:"italic",
