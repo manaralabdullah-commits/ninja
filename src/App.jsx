@@ -408,18 +408,51 @@ export default function App() {
     return Math.round((end - now) / (1000 * 60 * 60 * 24));
   }
 
-  function getKPIActual(kpiId) {
+  // ── KPI Actual — from Sheet proj.kpiActual ───────────────────────────────────
+  function getKPIActual(kpiId, projId) {
+    if (projId) {
+      const proj = data.projects.find(p => p.id === projId);
+      if (proj?.kpiActual && proj.kpiActual !== "" && proj.kpiActual !== "—") {
+        const v = parseFloat(String(proj.kpiActual).split("|")[0].trim());
+        if (!isNaN(v)) return v;
+      }
+    }
+    // fallback to static KPI
     const kpi = data.kpis.find(k => k.id === kpiId);
     return kpi?.actual ?? null;
   }
 
+  // ── KPI Target — from Sheet proj.kpiTarget ────────────────────────────────
+  function getKPITarget(projId) {
+    const proj = data.projects.find(p => p.id === projId);
+    if (proj?.kpiTarget && proj.kpiTarget !== "" && proj.kpiTarget !== "—") {
+      const nums = String(proj.kpiTarget).match(/\d+\.?\d*/g);
+      if (nums) return parseFloat(nums[0]);
+    }
+    return PRIMARY_KPI[projId]?.target ?? null;
+  }
+
+  // ── KPI Baseline — from Sheet proj.kpiBaseline ────────────────────────────
+  function getKPIBaseline(projId) {
+    const proj = data.projects.find(p => p.id === projId);
+    if (proj?.kpiBaseline && proj.kpiBaseline !== "" && proj.kpiBaseline !== "—") {
+      const v = parseFloat(String(proj.kpiBaseline));
+      if (!isNaN(v)) return v;
+    }
+    return PRIMARY_KPI[projId]?.baseline ?? null;
+  }
+
+  // ── Progress = (Actual - Baseline) / (Target - Baseline) × 100 ────────────
   function getKPIProgress(projId) {
-    const map = PRIMARY_KPI[projId];
-    if (!map || map.baseline === null || map.target === null) return null;
-    const actual = getKPIActual(map.kpi);
-    if (actual === null) return null;
-    const { baseline, target, dir } = map;
+    const actual   = getKPIActual(PRIMARY_KPI[projId]?.kpi, projId);
+    const target   = getKPITarget(projId);
+    const baseline = getKPIBaseline(projId);
+    const map      = PRIMARY_KPI[projId];
+
+    if (actual === null || target === null || baseline === null) return null;
     if (baseline === target) return 100;
+
+    const dir = map?.dir || "higher";
     let prog;
     if (dir === "higher") {
       prog = ((actual - baseline) / (target - baseline)) * 100;
@@ -898,13 +931,13 @@ export default function App() {
               <div>
                 <div style={{ fontSize:8,color:"#64748B",marginBottom:2 }}>Current</div>
                 <div style={{ fontSize:20,fontWeight:800,color:alertC.color,lineHeight:1 }}>
-                  {getKPIActual(map.kpi) ?? "—"} {map.unit}
+                  {getKPIActual(map.kpi, proj.id) ?? "—"} {map.unit}
                 </div>
               </div>
               <div style={{ textAlign:"right" }}>
                 <div style={{ fontSize:8,color:"#64748B",marginBottom:2 }}>Target</div>
                 <div style={{ fontSize:15,fontWeight:700,color:"#64748B" }}>
-                  {map.target} {map.unit}
+                  {(getKPITarget(proj.id) ?? map.target)} {map.unit}
                 </div>
               </div>
             </div>
@@ -915,8 +948,10 @@ export default function App() {
                 transition:"width 1s ease" }}/>
             </div>
             <div style={{ display:"flex",justifyContent:"space-between",marginTop:4,fontSize:8,color:"#334155" }}>
-              <span>Baseline: {map.baseline} {map.unit}</span>
-              <span style={{ fontWeight:700,color:alertC.color }}>{calcProg}%</span>
+              <span>Baseline: {getKPIBaseline(proj.id) ?? map?.baseline ?? "—"} {map?.unit}</span>
+              <span style={{ fontWeight:700,color:alertC.color }}>
+                {getKPIProgress(proj.id) ?? calcProg}%
+              </span>
             </div>
           </div>
         )}
