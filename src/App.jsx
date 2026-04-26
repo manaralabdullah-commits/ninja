@@ -920,20 +920,37 @@ export default function App() {
             </div>
           </div>
 
-          {/* ── Row 5: Phase tracker ── */}
+          {/* ── Row 5: Phase tracker — based on actual progress not just time ── */}
           <div style={{ marginBottom:16 }}>
             <div style={{ display:"flex",gap:4 }}>
               {phases.map((ph,i)=>{
-                const isDone   = ph.status==="Completed";
-                const isActive = ph.status==="In Progress";
+                // Phase progress based on where calcProg falls in 4 equal parts
+                const phFrom = i * 25;
+                const phTo   = (i + 1) * 25;
+                // How much of this phase is done based on real progress
+                const phFill = Math.min(Math.max((calcProg - phFrom) / 25, 0), 1);
+                const isDone   = calcProg >= phTo;
+                const isActive = calcProg >= phFrom && calcProg < phTo;
+                const isPending = calcProg < phFrom;
+
+                const barColor = isDone ? "#22C55E" : isActive ? "#22C1C3" : "rgba(255,255,255,0.08)";
+                const textColor = isDone ? "#22C55E" : isActive ? "#22C1C3" : "#334155";
+
                 return (
                   <div key={i} style={{ flex:1, textAlign:"center" }}>
+                    {/* Phase bar — shows partial fill for active phase */}
                     <div style={{ height:3,borderRadius:99,marginBottom:4,
-                      background: isDone ? "#22C55E" : isActive ? "#22C1C3" : "rgba(255,255,255,0.08)",
-                      boxShadow: isActive ? "0 0 6px #22C1C330" : "none",
-                      transition:"background 0.3s" }}/>
-                    <div style={{ fontSize:7,fontWeight:600,letterSpacing:0.3,
-                      color: isDone?"#22C55E":isActive?"#22C1C3":"#334155" }}>
+                      background:"rgba(255,255,255,0.08)",overflow:"hidden",
+                      position:"relative" }}>
+                      <div style={{
+                        position:"absolute",left:0,top:0,bottom:0,
+                        width: isDone?"100%":`${phFill*100}%`,
+                        background: isDone?"#22C55E":isActive?"#22C1C3":"transparent",
+                        borderRadius:99,
+                        transition:"width 0.8s ease",
+                      }}/>
+                    </div>
+                    <div style={{ fontSize:7,fontWeight:600,letterSpacing:0.3,color:textColor }}>
                       {ph.name.split(" ")[0]}
                     </div>
                   </div>
@@ -942,103 +959,124 @@ export default function App() {
             </div>
           </div>
 
-          {/* ── Row 6: KPI section ── */}
-          {kpiObj && map && (
-            <div style={{ background:progBg,borderRadius:10,
-              padding:"12px 14px",marginBottom:16,
-              border:`1px solid ${progColor}15` }}>
-              <div style={{ display:"flex",justifyContent:"space-between",
-                alignItems:"flex-start" }}>
-                <div>
-                  <div style={{ fontSize:8,color:"#475569",fontWeight:600,
-                    textTransform:"uppercase",letterSpacing:0.8,marginBottom:5 }}>
-                    {kpiObj.name}
-                  </div>
-                  <div style={{ display:"flex",alignItems:"baseline",gap:5 }}>
-                    <span style={{ fontSize:22,fontWeight:900,color:progColor,lineHeight:1 }}>
-                      {getKPIActual(map?.kpi, proj.id) ?? "—"}
-                    </span>
-                    <span style={{ fontSize:11,color:"#475569" }}>{map?.unit}</span>
-                    {/* Edit icon */}
-                    <span onClick={e=>{e.stopPropagation();setEditingActual(editingActual===proj.id?null:proj.id);}}
-                      style={{ fontSize:11,color:"#22C1C3",cursor:"pointer",
-                        marginLeft:4,opacity:0.7 }}>✏</span>
-                  </div>
-                </div>
-                <div style={{ textAlign:"right" }}>
-                  <div style={{ fontSize:8,color:"#475569",marginBottom:3 }}>Target</div>
-                  <div style={{ fontSize:13,fontWeight:700,color:"#64748B" }}>
-                    {getKPITarget(map?.kpi, proj.id) ?? map?.target ?? "—"} {map?.unit}
-                  </div>
-                  <div style={{ fontSize:8,color:"#475569",marginTop:3 }}>
-                    Base: {getKPIBaseline(map?.kpi, proj.id) ?? map?.baseline ?? "—"}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* ── Row 6+7+8: KPI tabs — click to switch, edit each ── */}
+          {linkedKPIs.length > 0 && (()=>{
+            const [activeKPI, setActiveKPI] = useState(0);
+            const selKPI = linkedKPIs[activeKPI];
+            const actual   = getKPIActual(selKPI?.id, proj.id);
+            const target   = getKPITarget(selKPI?.id, proj.id) ?? selKPI?.target;
+            const baseline = getKPIBaseline(selKPI?.id, proj.id) ?? null;
+            const [editVal, setEditVal] = useState("");
+            const [saving,  setSaving]  = useState(false);
+            const [saved,   setSaved]   = useState(false);
 
-          {/* ── Row 7: Inline KPI edit ── */}
-          {editingActual === proj.id && (
-            <div style={{ background:"rgba(34,193,195,0.06)",borderRadius:10,
-              padding:"12px 14px",marginBottom:16,
-              border:"1px solid rgba(34,193,195,0.2)" }}
-              onClick={e=>e.stopPropagation()}>
-              <div style={{ fontSize:9,color:"#22C1C3",fontWeight:700,marginBottom:8 }}>
-                Update KPI Actual — syncs to Sheet
-              </div>
-              {linkedKPIs.map(k => {
-                const [val, setVal] = useState(k.actual !== undefined ? String(k.actual) : "");
-                return (
-                  <div key={k.id} style={{ display:"flex",alignItems:"center",gap:6,marginBottom:6 }}>
-                    <span style={{ fontSize:9,color:"#94A3B8",flex:1,
-                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{k.name}</span>
-                    <span style={{ fontSize:9,color:"#22C55E",
-                      background:"rgba(34,197,94,0.1)",borderRadius:99,
-                      padding:"1px 6px",whiteSpace:"nowrap" }}>T:{k.q1}</span>
-                    <input value={val} onChange={e=>setVal(e.target.value)}
-                      placeholder="Actual"
-                      style={{ width:60,background:"rgba(34,193,195,0.08)",
-                        border:"1px solid #22C1C3",borderRadius:6,
-                        padding:"3px 7px",color:"#E2E8F0",
+            // Progress for selected KPI
+            let kpiProg = null;
+            if (actual !== null && target !== null && baseline !== null && baseline !== target) {
+              const dir = PRIMARY_KPI[proj.id]?.dir || "higher";
+              kpiProg = dir === "higher"
+                ? Math.round(((actual-baseline)/(target-baseline))*100)
+                : Math.round(((baseline-actual)/(baseline-target))*100);
+              kpiProg = Math.min(Math.max(kpiProg, 0), 100);
+            }
+            const kpiColor = kpiProg===null ? "#64748B" : kpiProg>=70 ? "#22C55E" : kpiProg>=40 ? "#F59E0B" : "#EF4444";
+
+            async function saveActual(kId, val) {
+              setSaving(true);
+              try {
+                const payload = { id:proj.id, kpiId:kId, kpiActual:val,
+                  updatedBy:currentUser?.name||"", role:currentUser?.role||"" };
+                const url = `/.netlify/functions/proxy?func=updateProject&data=${encodeURIComponent(JSON.stringify(payload))}`;
+                const res = await fetch(url);
+                const d2  = await res.json();
+                if (d2.ok) { setSaved(true); setTimeout(()=>setSaved(false),2000); }
+              } catch(e) { console.error(e); }
+              setSaving(false);
+            }
+
+            return (
+              <div style={{ marginBottom:16 }}>
+                {/* KPI Tab buttons */}
+                {linkedKPIs.length > 1 && (
+                  <div style={{ display:"flex",gap:4,marginBottom:8,flexWrap:"wrap" }}>
+                    {linkedKPIs.map((k,i)=>(
+                      <button key={k.id}
+                        onClick={e=>{e.stopPropagation();setActiveKPI(i);setEditVal("");setSaved(false);}}
+                        style={{ fontSize:9,fontWeight:700,borderRadius:7,
+                          padding:"3px 10px",cursor:"pointer",fontFamily:"inherit",
+                          border:`1px solid ${i===activeKPI?"#22C1C3":"rgba(255,255,255,0.08)"}`,
+                          background:i===activeKPI?"rgba(34,193,195,0.12)":"rgba(255,255,255,0.03)",
+                          color:i===activeKPI?"#22C1C3":"#64748B",
+                          transition:"all 0.15s" }}>
+                        {k.id}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* KPI Display */}
+                <div style={{ background:`${kpiColor}08`,borderRadius:10,
+                  padding:"12px 14px",
+                  border:`1px solid ${kpiColor}18` }}>
+                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8 }}>
+                    <div>
+                      <div style={{ fontSize:8,color:"#475569",fontWeight:600,
+                        textTransform:"uppercase",letterSpacing:0.8,marginBottom:5 }}>
+                        {selKPI?.name}
+                      </div>
+                      <div style={{ display:"flex",alignItems:"baseline",gap:4 }}>
+                        <span style={{ fontSize:22,fontWeight:900,color:kpiColor,lineHeight:1 }}>
+                          {actual ?? "—"}
+                        </span>
+                        <span style={{ fontSize:11,color:"#475569" }}>{selKPI?.unit||"%"}</span>
+                      </div>
+                      {kpiProg !== null && (
+                        <div style={{ fontSize:9,color:kpiColor,fontWeight:600,marginTop:3 }}>
+                          {kpiProg}% achieved
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ textAlign:"right" }}>
+                      <div style={{ fontSize:8,color:"#475569",marginBottom:3 }}>Target</div>
+                      <div style={{ fontSize:13,fontWeight:700,color:"#64748B" }}>
+                        {target ?? "—"} {selKPI?.unit||"%"}
+                      </div>
+                      {baseline !== null && (
+                        <div style={{ fontSize:8,color:"#334155",marginTop:3 }}>
+                          Base: {baseline}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Inline actual input */}
+                  <div style={{ display:"flex",alignItems:"center",gap:6,
+                    paddingTop:8,borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+                    <span style={{ fontSize:9,color:"#475569",flex:1 }}>Update Actual:</span>
+                    <input
+                      value={editVal}
+                      onChange={e=>{e.stopPropagation();setEditVal(e.target.value);}}
+                      onClick={e=>e.stopPropagation()}
+                      placeholder={actual ?? "Enter value"}
+                      style={{ width:70,background:"rgba(34,193,195,0.08)",
+                        border:"1px solid rgba(34,193,195,0.3)",borderRadius:7,
+                        padding:"4px 8px",color:"#E2E8F0",
                         fontSize:10,fontFamily:"inherit",outline:"none",textAlign:"center" }}/>
-                    <button onClick={async()=>{
-                      try {
-                        const payload = { id:proj.id, kpiId:k.id, kpiActual:val,
-                          updatedBy:currentUser?.name||"", role:currentUser?.role||"" };
-                        const url = `/.netlify/functions/proxy?func=updateProject&data=${encodeURIComponent(JSON.stringify(payload))}`;
-                        const res = await fetch(url);
-                        const d2 = await res.json();
-                        if (d2.ok) { k.actual=parseFloat(val)||val; setEditingActual(null); }
-                      } catch(e) { console.error(e); }
-                    }} style={{ background:"#22C55E",color:"#fff",border:"none",
-                      borderRadius:6,padding:"3px 8px",fontSize:9,
-                      fontWeight:700,cursor:"pointer",whiteSpace:"nowrap" }}>Save</button>
+                    <button
+                      onClick={async e=>{e.stopPropagation();if(editVal)await saveActual(selKPI?.id,editVal);}}
+                      disabled={!editVal||saving}
+                      style={{ background:saved?"#22C55E":editVal?"#22C1C3":"rgba(255,255,255,0.06)",
+                        color:"#fff",border:"none",borderRadius:7,
+                        padding:"4px 12px",fontSize:9,fontWeight:700,
+                        cursor:editVal?"pointer":"default",fontFamily:"inherit",
+                        transition:"all 0.2s",whiteSpace:"nowrap" }}>
+                      {saved?"✓ Saved":saving?"...":"Save"}
+                    </button>
                   </div>
-                );
-              })}
-              <button onClick={e=>{e.stopPropagation();setEditingActual(null);}}
-                style={{ width:"100%",background:"rgba(255,255,255,0.04)",border:"none",
-                  borderRadius:6,padding:"5px 0",fontSize:9,color:"#64748B",
-                  cursor:"pointer",marginTop:4,fontFamily:"inherit" }}>Cancel</button>
-            </div>
-          )}
-
-          {/* ── Row 8: KPI tags ── */}
-          {linkedKPIs.length > 0 && (
-            <div style={{ display:"flex",flexWrap:"wrap",gap:4,marginBottom:16 }}>
-              {linkedKPIs.slice(0,3).map(k=>(
-                <span key={k.id} style={{ fontSize:9,fontWeight:600,color:"#22C1C3",
-                  background:"rgba(34,193,195,0.07)",border:"1px solid rgba(34,193,195,0.12)",
-                  borderRadius:6,padding:"2px 8px" }}>
-                  {k.name}
-                </span>
-              ))}
-              {linkedKPIs.length>3 && (
-                <span style={{ fontSize:9,color:"#475569" }}>+{linkedKPIs.length-3}</span>
-              )}
-            </div>
-          )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ── Row 9: Action buttons ── */}
           <div style={{ display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",
