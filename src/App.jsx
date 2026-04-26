@@ -1235,33 +1235,84 @@ export default function App() {
   const DeptView = () => {
     const dept = data.departments.find(d => d.id === activeDept);
     if (!dept) return null;
-    const dKPIs = data.kpis.filter(k => k.dept === dept.id);
-    const dProj = data.projects.filter(p => p.dept === dept.id);
+    const dKPIs  = data.kpis.filter(k => k.dept === dept.id);
+    const dProj  = data.projects.filter(p => p.dept === dept.id);
+    const good   = dKPIs.filter(k => getKPIStatus(k) === "good").length;
+    const warn   = dKPIs.filter(k => getKPIStatus(k) === "warning").length;
+    const crit   = dKPIs.filter(k => getKPIStatus(k) === "critical").length;
+    const onTrack   = dProj.filter(p => getAlertStatus(p) === "ontrack").length;
+    const atRisk    = dProj.filter(p => getAlertStatus(p) === "atrisk").length;
+    const overdue   = dProj.filter(p => getAlertStatus(p) === "overdue").length;
+    const completed = dProj.filter(p => p.status === "Completed").length;
 
     return (
-      <div key={animKey} style={{ animation: "fadeIn 0.5s ease" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: 14,
-            background: `${dept.color}20`, display: "flex",
-            alignItems: "center", justifyContent: "center", fontSize: 24,
-          }}>{dept.icon}</div>
+      <div key={animKey} style={{ animation:"fadeIn 0.4s ease" }}>
+
+        {/* ── Dept Header ── */}
+        <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:24 }}>
+          <div style={{ width:52, height:52, borderRadius:16,
+            background:`${dept.color}18`, border:`2px solid ${dept.color}30`,
+            display:"flex", alignItems:"center", justifyContent:"center", fontSize:26 }}>
+            {dept.icon}
+          </div>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: "#F1F5F9" }}>{dept.name}</div>
-            <div style={{ fontSize: 12, color: "#64748B" }}>{dKPIs.length} KPIs · {dProj.length} Projects</div>
+            <div style={{ fontSize:24, fontWeight:900, color:"#F1F5F9", letterSpacing:-0.5 }}>{dept.name}</div>
+            <div style={{ fontSize:12, color:"#64748B", marginTop:2 }}>
+              {dProj.length} Projects · {dKPIs.length} KPIs tracked
+            </div>
           </div>
         </div>
 
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#94A3B8", marginBottom: 12,
-          textTransform: "uppercase", letterSpacing: 1 }}>KPIs</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14, marginBottom: 28 }}>
-          {dKPIs.map(kpi => <KPICard key={kpi.id} kpi={kpi} />)}
+        {/* ── Summary Stats ── */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:24 }}>
+          {[
+            { label:"On Track",  val:onTrack,   color:"#10B981", bg:"rgba(16,185,129,0.08)"  },
+            { label:"At Risk",   val:atRisk,    color:"#F59E0B", bg:"rgba(245,158,11,0.08)"  },
+            { label:"Overdue",   val:overdue,   color:"#EF4444", bg:"rgba(239,68,68,0.08)"   },
+            { label:"Completed", val:completed, color:"#00C2D4", bg:"rgba(0,194,212,0.08)"   },
+          ].map(s=>(
+            <div key={s.label} style={{ background:s.bg, borderRadius:12,
+              padding:"12px 14px", border:`1px solid ${s.color}20`,
+              textAlign:"center" }}>
+              <div style={{ fontSize:26, fontWeight:900, color:s.color, lineHeight:1 }}>{s.val}</div>
+              <div style={{ fontSize:10, color:"#64748B", marginTop:4, fontWeight:600 }}>{s.label}</div>
+            </div>
+          ))}
         </div>
 
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#94A3B8", marginBottom: 12,
-          textTransform: "uppercase", letterSpacing: 1 }}>Projects</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
-          {dProj.map(p => <ProjectCard key={p.id} proj={p} />)}
+        {/* ── KPI Health Bar (compact) ── */}
+        <div style={{ background:"rgba(255,255,255,0.03)", borderRadius:12,
+          padding:"12px 16px", marginBottom:24,
+          border:"1px solid rgba(255,255,255,0.07)" }}>
+          <div style={{ display:"flex", justifyContent:"space-between",
+            alignItems:"center", marginBottom:8 }}>
+            <span style={{ fontSize:11, fontWeight:700, color:"#94A3B8",
+              textTransform:"uppercase", letterSpacing:0.8 }}>KPI Health</span>
+            <div style={{ display:"flex", gap:12, fontSize:10 }}>
+              <span style={{ color:"#10B981" }}>✓ {good} Good</span>
+              <span style={{ color:"#F59E0B" }}>⚠ {warn} At Risk</span>
+              <span style={{ color:"#EF4444" }}>✕ {crit} Critical</span>
+            </div>
+          </div>
+          <div style={{ display:"flex", height:8, borderRadius:99, overflow:"hidden", gap:2 }}>
+            {good>0&&<div style={{ flex:good, background:"#10B981", borderRadius:99 }}/>}
+            {warn>0&&<div style={{ flex:warn, background:"#F59E0B", borderRadius:99 }}/>}
+            {crit>0&&<div style={{ flex:crit, background:"#EF4444", borderRadius:99 }}/>}
+          </div>
+        </div>
+
+        {/* ── Projects ── */}
+        <div style={{ fontSize:13, fontWeight:700, color:"#94A3B8", marginBottom:14,
+          textTransform:"uppercase", letterSpacing:1,
+          display:"flex", alignItems:"center", gap:8 }}>
+          <div style={{ width:3, height:16, borderRadius:99, background:dept.color }}/>
+          Projects
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))", gap:16 }}>
+          {dProj.length > 0
+            ? dProj.map(p => <ProjectCard key={p.id} proj={p} />)
+            : <div style={{ color:"#475569", fontSize:13, padding:20 }}>No projects in this department.</div>
+          }
         </div>
       </div>
     );
