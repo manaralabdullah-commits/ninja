@@ -759,220 +759,318 @@ export default function App() {
 
   // ── PROJECT CARD ──────────────────────────────────────────────────────────
   const ProjectCard = ({ proj }) => {
-    const dept    = data.departments.find(d => d.id === proj.dept);
-    const stCfg   = getProjStatusConfig(proj.status);
-    const priCfg  = { Critical:"#EF4444", High:"#F59E0B", Medium:"#00C2D4", Low:"#10B981" }[proj.priority] || "#64748B";
+    const dept      = data.departments.find(d => d.id === proj.dept);
     const linkedKPIs = data.kpis.filter(k => proj.kpis.includes(k.id));
-    const alert   = getAlertStatus(proj);
-    const alertC  = ALERT_CFG[alert];
-    const days    = proj.endDate ? daysRemaining(proj.endDate) : null;
-    const [localActual, setLocalActual] = useState(proj.kpiActual || "");
-    const isEditing = editingActual === proj.id;
+    const alert     = getAlertStatus(proj);
+    const alertC    = ALERT_CFG[alert];
+    const days      = proj.endDate ? daysRemaining(proj.endDate) : null;
+    const map       = PRIMARY_KPI[proj.id];
+    const kpiObj    = map ? data.kpis.find(k => k.id === map.kpi) : null;
+    const kpiProg   = getKPIProgress(proj.id);
+    const calcProg  = getProjProgress(proj.id) ?? proj.progress;
+    const priCfg    = { Critical:"#EF4444", High:"#F59E0B", Medium:"#00C2D4", Low:"#10B981" }[proj.priority] || "#64748B";
+    const stCfg     = getProjStatusConfig(proj.status);
+    const [alertSent, setAlertSent] = useState(false);
 
-    function saveActual(e) {
-      e.stopPropagation();
-      setProjects && setProjects(ps => ps.map(p => p.id===proj.id ? {...p,kpiActual:localActual} : p));
-      data.projects.forEach(p => { if(p.id===proj.id) p.kpiActual=localActual; });
-      setEditingActual(null);
+    // Format date cleanly
+    function fmtDate(d) {
+      if (!d) return "";
+      try {
+        return new Date(d).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});
+      } catch { return d; }
     }
 
-    return (
-      <div style={cardStyle(`proj-${proj.id}`)}
-        onMouseEnter={() => setHoveredCard(`proj-${proj.id}`)}
-        onMouseLeave={() => setHoveredCard(null)}>
+    // Avatar initials
+    const initials = (proj.lead||"??").split(" ").slice(0,2).map(w=>w[0]).join("");
 
-        {/* Header */}
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
-          <div style={{ flex:1 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:3 }}>
-              <span style={{ fontSize:13 }}>{dept?.icon}</span>
-              <span style={{ fontSize:9, color:dept?.color, fontWeight:700 }}>{proj.id}</span>
-              <span style={{ ...S.badge(priCfg), fontSize:8 }}>{proj.priority}</span>
-            </div>
-            <div style={{ fontSize:12, fontWeight:700, color:"#F1F5F9", lineHeight:1.3 }}>{proj.name}</div>
-            <div style={{ fontSize:10, color:"#64748B", marginTop:2 }}>
-              👤 {proj.lead}
-              {proj.email && <span style={{ color:"#00C2D4", marginLeft:4 }}>· {proj.email}</span>}
-            </div>
+    return (
+      <div style={{
+        background:"linear-gradient(145deg,#0F1B2D 0%,#0D1626 100%)",
+        borderRadius:18,
+        border:`1px solid ${alertC.color}20`,
+        boxShadow:`0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)`,
+        padding:"20px 20px 16px",
+        display:"flex", flexDirection:"column", gap:0,
+        position:"relative", overflow:"hidden",
+        cursor:"pointer",
+        transition:"transform 0.15s, box-shadow 0.15s",
+      }}
+      onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=`0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)`;}}
+      onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow=`0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)`;}}
+      >
+        {/* Glow */}
+        <div style={{ position:"absolute",top:-30,right:-30,width:100,height:100,
+          borderRadius:"50%",background:`${alertC.color}06`,pointerEvents:"none"}}/>
+
+        {/* ── Row 1: ID + Priority + Status ── */}
+        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10 }}>
+          <div style={{ display:"flex",alignItems:"center",gap:6 }}>
+            <span style={{ fontSize:13 }}>{dept?.icon}</span>
+            <span style={{ fontSize:9,color:dept?.color,fontWeight:700,letterSpacing:0.5 }}>{proj.id}</span>
+            <span style={{ fontSize:9,fontWeight:700,color:priCfg,
+              background:`${priCfg}15`,borderRadius:99,padding:"2px 7px" }}>
+              {proj.priority}
+            </span>
           </div>
-          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4 }}>
-            <div style={{ ...S.badge(stCfg.color), fontSize:9 }}>{proj.status}</div>
-            <div style={{ background:alertC.bg, color:alertC.color,
-              border:`1px solid ${alertC.color}30`, borderRadius:99,
-              padding:"2px 7px", fontSize:9, fontWeight:700, whiteSpace:"nowrap" }}>
-              {alertC.label}
+          <div style={{ display:"flex",alignItems:"center",gap:5,
+            background:stCfg.bg||`${stCfg.color}15`,borderRadius:99,
+            padding:"4px 10px",border:`1px solid ${stCfg.color}25` }}>
+            <div style={{ width:6,height:6,borderRadius:"50%",
+              background:stCfg.color,boxShadow:`0 0 6px ${stCfg.color}` }}/>
+            <span style={{ fontSize:10,fontWeight:700,color:stCfg.color }}>{proj.status}</span>
+          </div>
+        </div>
+
+        {/* ── Row 2: Title ── */}
+        <div style={{ fontSize:13,fontWeight:700,color:"#F1F5F9",
+          lineHeight:1.35,marginBottom:10,letterSpacing:-0.2 }}>
+          {proj.name}
+        </div>
+
+        {/* ── Row 3: Owner ── */}
+        <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:12,
+          padding:"7px 10px",background:"rgba(255,255,255,0.03)",
+          borderRadius:10,border:"1px solid rgba(255,255,255,0.05)" }}>
+          <div style={{ width:26,height:26,borderRadius:"50%",flexShrink:0,
+            background:`${dept?.color||"#64748B"}20`,border:`1.5px solid ${dept?.color||"#64748B"}50`,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:9,fontWeight:800,color:dept?.color||"#64748B" }}>
+            {initials}
+          </div>
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontSize:11,fontWeight:600,color:"#CBD5E1",
+              overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
+              {proj.lead}
+            </div>
+            <div style={{ fontSize:9,color:"#475569",
+              overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
+              {proj.email}
             </div>
           </div>
         </div>
 
-        {/* Dates + Days remaining */}
+        {/* ── Row 4: Dates ── */}
         {proj.startDate && (
-          <div style={{ display:"flex", gap:8, marginBottom:8, fontSize:10 }}>
-            <span style={{ color:"#64748B" }}>📅 {proj.startDate} → {proj.endDate}</span>
+          <div style={{ display:"flex",gap:8,marginBottom:12 }}>
+            {[["Start",proj.startDate],["End",proj.endDate]].map(([label,date])=>(
+              <div key={label} style={{ flex:1,background:"rgba(255,255,255,0.03)",
+                borderRadius:9,padding:"7px 10px",
+                border:`1px solid ${label==="End" && days!==null && days<0 ? "#EF444430":"rgba(255,255,255,0.05)"}` }}>
+                <div style={{ fontSize:8,color:"#475569",fontWeight:600,
+                  textTransform:"uppercase",letterSpacing:0.8,marginBottom:2 }}>{label}</div>
+                <div style={{ fontSize:11,fontWeight:600,
+                  color:label==="End" && days!==null && days<0 ? "#EF4444":"#94A3B8" }}>
+                  {fmtDate(date)}
+                </div>
+              </div>
+            ))}
             {days !== null && (
-              <span style={{
-                fontWeight:700,
-                color: days < 0 ? "#EF4444" : days < 14 ? "#F59E0B" : "#10B981"
-              }}>
-                {days < 0 ? `⚠ ${Math.abs(days)}d overdue` : `${days}d left`}
-              </span>
+              <div style={{ flexShrink:0,background:days<0?"rgba(239,68,68,0.1)":days<14?"rgba(245,158,11,0.1)":"rgba(16,185,129,0.08)",
+                borderRadius:9,padding:"7px 10px",
+                border:`1px solid ${days<0?"rgba(239,68,68,0.25)":days<14?"rgba(245,158,11,0.25)":"rgba(16,185,129,0.2)"}`,
+                display:"flex",alignItems:"center",justifyContent:"center" }}>
+                <div style={{ textAlign:"center" }}>
+                  <div style={{ fontSize:8,color:"#475569",fontWeight:600,
+                    textTransform:"uppercase",letterSpacing:0.8,marginBottom:2 }}>
+                    {days<0?"Overdue":"Left"}
+                  </div>
+                  <div style={{ fontSize:12,fontWeight:800,
+                    color:days<0?"#EF4444":days<14?"#F59E0B":"#10B981" }}>
+                    {Math.abs(days)}d
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}
 
-        {/* Progress */}
-        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
-          <div style={{ position:"relative", width:44, height:44, flexShrink:0 }}>
-            <RadialGauge value={proj.progress} color={alertC.color} size={44} />
-            <div style={{ position:"absolute", inset:0, display:"flex",
-              alignItems:"center", justifyContent:"center",
-              fontSize:9, fontWeight:800, color:alertC.color }}>
-              {proj.progress}%
+        {/* ── Row 5: KPI Performance ── */}
+        {kpiObj && map && (
+          <div style={{ background:`${alertC.color}08`,borderRadius:12,
+            padding:"11px 13px",marginBottom:12,
+            border:`1px solid ${alertC.color}18` }}>
+            <div style={{ fontSize:8,color:"#475569",fontWeight:700,
+              textTransform:"uppercase",letterSpacing:0.8,marginBottom:8 }}>
+              {kpiObj.name}
+            </div>
+            <div style={{ display:"flex",justifyContent:"space-between",
+              alignItems:"flex-end",marginBottom:8 }}>
+              <div>
+                <div style={{ fontSize:8,color:"#64748B",marginBottom:2 }}>Current</div>
+                <div style={{ fontSize:20,fontWeight:800,color:alertC.color,lineHeight:1 }}>
+                  {getKPIActual(map.kpi) ?? "—"} {map.unit}
+                </div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ fontSize:8,color:"#64748B",marginBottom:2 }}>Target</div>
+                <div style={{ fontSize:15,fontWeight:700,color:"#64748B" }}>
+                  {map.target} {map.unit}
+                </div>
+              </div>
+            </div>
+            {/* Progress bar */}
+            <div style={{ height:6,borderRadius:99,background:"rgba(255,255,255,0.07)",overflow:"hidden" }}>
+              <div style={{ width:`${calcProg}%`,height:"100%",borderRadius:99,
+                background:`linear-gradient(90deg,${alertC.color}70,${alertC.color})`,
+                transition:"width 1s ease" }}/>
+            </div>
+            <div style={{ display:"flex",justifyContent:"space-between",marginTop:4,fontSize:8,color:"#334155" }}>
+              <span>Baseline: {map.baseline} {map.unit}</span>
+              <span style={{ fontWeight:700,color:alertC.color }}>{calcProg}%</span>
             </div>
           </div>
-          <div style={{ flex:1 }}>
-            {(()=>{
-              const kpiProg = getKPIProgress(proj.id);
-              const calcProg = getProjProgress(proj.id) ?? proj.progress;
-              const map = PRIMARY_KPI[proj.id];
-              const kpiObj = map ? data.kpis.find(k=>k.id===map.kpi) : null;
-              return (
-                <>
-                  <div style={{ display:"flex", justifyContent:"space-between", fontSize:9, color:"#64748B", marginBottom:3 }}>
-                    <span style={{ display:"flex", alignItems:"center", gap:4 }}>
-                      {kpiProg!==null
-                        ? <><span style={{color:"#00C2D4",fontWeight:700}}>KPI-Based</span>
-                            <span style={{color:"#334155"}}>· {kpiObj?.name||map?.kpi}</span></>
-                        : <span>Progress</span>
-                      }
-                    </span>
-                    <span style={{ fontWeight:800, color:alertC.color, fontSize:11 }}>{calcProg}%</span>
-                  </div>
-                  <ProgressBar value={calcProg} color={alertC.color} height={6} />
-                  {kpiProg!==null && map && (
-                    <div style={{ display:"flex", justifyContent:"space-between", marginTop:4, fontSize:9 }}>
-                      <span style={{color:"#334155"}}>Baseline: <b style={{color:"#64748B"}}>{map.baseline} {map.unit}</b></span>
-                      <span style={{color:"#334155"}}>Actual: <b style={{color:"#00C2D4"}}>{getKPIActual(map.kpi)??'—'} {map.unit}</b></span>
-                      <span style={{color:"#334155"}}>Target: <b style={{color:"#10B981"}}>{map.target} {map.unit}</b></span>
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-        </div>
+        )}
 
-        {/* KPI Actual vs Target */}
-        <div style={{ background:"rgba(255,255,255,0.04)", borderRadius:8,
-          padding:"8px 10px", marginBottom:8,
-          border:"1px solid rgba(255,255,255,0.08)" }}>
-          <div style={{ fontSize:9, color:"#64748B", marginBottom:5, fontWeight:700,
-            textTransform:"uppercase", letterSpacing:0.6 }}>KPI Actual vs Target</div>
-          {linkedKPIs.slice(0,3).map(k => {
-            const kst = getKPIStatus(k);
-            const kc  = getStatusConfig(kst).color;
-            return (
-              <div key={k.id} style={{ display:"flex", alignItems:"center",
-                justifyContent:"space-between", marginBottom:4, gap:6 }}>
-                <span style={{ fontSize:9, color:"#94A3B8", flex:1, overflow:"hidden",
-                  textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{k.name}</span>
-                <span style={{ fontSize:9, fontWeight:700, color:"#10B981",
-                  background:"rgba(16,185,129,0.1)", borderRadius:99,
-                  padding:"1px 6px" }}>T:{k.q1}</span>
-                <span style={{ fontSize:9, fontWeight:700, color:kc,
-                  background:`${kc}15`, borderRadius:99, padding:"1px 6px" }}>
-                  A:{typeof k.actual==="number"?k.actual:k.actual||"—"}
-                </span>
-              </div>
-            );
-          })}
-          {/* Editable KPI Actual override */}
-          <div style={{ marginTop:6, display:"flex", alignItems:"center", gap:5 }}>
-            {isEditing ? (
-              <>
-                <input value={localActual}
-                  onChange={e=>setLocalActual(e.target.value)}
-                  onClick={e=>e.stopPropagation()}
-                  placeholder="Enter actual value..."
-                  style={{ flex:1, background:"rgba(255,255,255,0.08)",
-                    border:"1px solid #00C2D4", borderRadius:6, padding:"4px 8px",
-                    color:"#E2E8F0", fontSize:10, fontFamily:"inherit", outline:"none" }}/>
-                <button onClick={saveActual}
-                  style={{ background:"#10B981", color:"#fff", border:"none",
-                    borderRadius:6, padding:"4px 8px", fontSize:9,
-                    fontWeight:700, cursor:"pointer" }}>Save</button>
-                <button onClick={e=>{e.stopPropagation();setEditingActual(null);}}
-                  style={{ background:"rgba(255,255,255,0.08)", color:"#64748B",
-                    border:"none", borderRadius:6, padding:"4px 7px",
-                    fontSize:9, cursor:"pointer" }}>✕</button>
-              </>
-            ) : (
-              <button onClick={e=>{e.stopPropagation();setEditingActual(proj.id);}}
-                style={{ background:"rgba(0,194,212,0.12)", color:"#00C2D4",
-                  border:"1px solid rgba(0,194,212,0.25)", borderRadius:6,
-                  padding:"3px 10px", fontSize:9, fontWeight:700,
-                  cursor:"pointer", width:"100%" }}>
-                {localActual ? `✏ Actual: ${localActual}` : "✏ Enter KPI Actual"}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* KPI badges */}
-        <div style={{ display:"flex", flexWrap:"wrap", gap:3, marginBottom:6 }}>
-          {linkedKPIs.map(k => {
-            const kst = getKPIStatus(k);
-            const kc  = getStatusConfig(kst).color;
-            return (
-              <span key={k.id} style={{ ...S.badge(kc), fontSize:8 }}
-                onClick={e=>{e.stopPropagation();navigate("kpi-detail",k.dept,k.id);}}>
+        {/* ── Row 6: KPI badges ── */}
+        {linkedKPIs.length > 0 && (
+          <div style={{ display:"flex",flexWrap:"wrap",gap:4,marginBottom:8 }}>
+            {linkedKPIs.slice(0,4).map(k=>(
+              <span key={k.id} style={{ fontSize:9,fontWeight:700,color:"#00C2D4",
+                background:"rgba(0,194,212,0.1)",border:"1px solid rgba(0,194,212,0.2)",
+                borderRadius:99,padding:"2px 8px" }}>
                 {k.name}
               </span>
-            );
-          })}
-        </div>
-
-        {/* Alert email button — executive only */}
-        {currentUser?.role==="executive" && (alert==="overdue"||alert==="atrisk") && proj.email && (
-          <div style={{ background:"rgba(239,68,68,0.08)",
-            border:"1px solid rgba(239,68,68,0.2)", borderRadius:7,
-            padding:"6px 10px", display:"flex", alignItems:"center",
-            justifyContent:"space-between", marginBottom:6 }}>
-            <span style={{ fontSize:9, color:"#EF4444", fontWeight:600 }}>
-              📧 Send alert to {proj.lead}
-            </span>
-            <button onClick={e=>{e.stopPropagation();setAlertModal(proj);}}
-              style={{ background:"#EF4444", color:"#fff", border:"none",
-                borderRadius:6, padding:"3px 9px", fontSize:9,
-                fontWeight:700, cursor:"pointer" }}>
-              Send
-            </button>
+            ))}
+            {linkedKPIs.length>4&&<span style={{fontSize:9,color:"#475569"}}>+{linkedKPIs.length-4}</span>}
           </div>
         )}
 
-        <div style={{ display:"flex", gap:6, marginTop:6 }}>
-          {proj.trello && (
+        {/* ── Row 6b: Update KPI Actual ── */}
+        {editingActual === proj.id ? (
+          <div style={{ background:"rgba(0,194,212,0.06)",borderRadius:10,
+            padding:"10px 12px",marginBottom:12,
+            border:"1px solid rgba(0,194,212,0.2)" }}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{ fontSize:9,color:"#00C2D4",fontWeight:700,
+              textTransform:"uppercase",letterSpacing:0.8,marginBottom:8 }}>
+              ✏ Update KPI Actual — syncs to sheet
+            </div>
+            {linkedKPIs.map(k => {
+              const [val, setVal] = useState(k.actual !== undefined ? String(k.actual) : "");
+              return (
+                <div key={k.id} style={{ display:"flex",alignItems:"center",gap:6,marginBottom:6 }}>
+                  <span style={{ fontSize:9,color:"#94A3B8",flex:1,
+                    overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
+                    {k.name}
+                  </span>
+                  <span style={{ fontSize:9,color:"#10B981",
+                    background:"rgba(16,185,129,0.1)",borderRadius:99,
+                    padding:"1px 6px",whiteSpace:"nowrap" }}>T:{k.q1}</span>
+                  <input value={val} onChange={e=>setVal(e.target.value)}
+                    placeholder="Actual"
+                    style={{ width:60,background:"rgba(0,194,212,0.08)",
+                      border:"1px solid #00C2D4",borderRadius:6,
+                      padding:"3px 7px",color:"#E2E8F0",
+                      fontSize:10,fontFamily:"inherit",outline:"none",textAlign:"center" }}/>
+                  <button onClick={async()=>{
+                    try {
+                      const payload = { id:proj.id, kpiId:k.id,
+                        kpiActual:val, updatedBy:currentUser?.name||"", role:currentUser?.role||"" };
+                      const url = `/.netlify/functions/proxy?func=updateProject&data=${encodeURIComponent(JSON.stringify(payload))}`;
+                      const res = await fetch(url);
+                      const data2 = await res.json();
+                      if (data2.ok) {
+                        k.actual = parseFloat(val)||val;
+                        setEditingActual(null);
+                        console.log("✅ Updated in sheet");
+                      }
+                    } catch(e) { console.error(e); }
+                  }} style={{ background:"#10B981",color:"#fff",border:"none",
+                    borderRadius:6,padding:"3px 8px",fontSize:9,
+                    fontWeight:700,cursor:"pointer",whiteSpace:"nowrap" }}>
+                    Save ✓
+                  </button>
+                </div>
+              );
+            })}
+            <button onClick={e=>{e.stopPropagation();setEditingActual(null);}}
+              style={{ width:"100%",background:"rgba(255,255,255,0.05)",border:"none",
+                borderRadius:6,padding:"4px 0",fontSize:9,color:"#64748B",
+                cursor:"pointer",marginTop:4 }}>Cancel</button>
+          </div>
+        ) : (
+          <button onClick={e=>{e.stopPropagation();setEditingActual(proj.id);}}
+            style={{ width:"100%",background:"rgba(0,194,212,0.07)",color:"#00C2D4",
+              border:"1px solid rgba(0,194,212,0.18)",borderRadius:8,
+              padding:"6px 0",fontSize:10,fontWeight:700,
+              cursor:"pointer",marginBottom:12,fontFamily:"inherit" }}>
+            ✏ Update KPI Actual
+          </button>
+        )}
+
+        {/* ── Row 7: Milestones inline ── */}
+        {expandMs===proj.id && MILESTONES[proj.id] && (
+          <div style={{ marginBottom:12,borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:10 }}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{ position:"relative",paddingLeft:16 }}>
+              <div style={{ position:"absolute",left:6,top:4,bottom:4,width:1.5,
+                background:"rgba(124,58,237,0.25)",borderRadius:99 }}/>
+              {MILESTONES[proj.id].map((m,i)=>{
+                const dl=Math.round((new Date(m.date)-new Date())/(1000*60*60*24));
+                return (
+                  <div key={i} style={{ display:"flex",alignItems:"flex-start",gap:8,marginBottom:7,position:"relative" }}>
+                    <div style={{ width:11,height:11,borderRadius:"50%",flexShrink:0,
+                      position:"absolute",left:-11,top:2,
+                      background:m.done?"#10B981":dl<0?"#EF4444":"rgba(255,255,255,0.1)",
+                      border:`1.5px solid ${m.done?"#10B981":dl<0?"#EF4444":"rgba(255,255,255,0.2)"}`,
+                      display:"flex",alignItems:"center",justifyContent:"center",
+                      fontSize:6,color:"#fff",fontWeight:900 }}>{m.done?"✓":""}</div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:10,fontWeight:600,
+                        color:m.done?"#64748B":dl<0?"#EF4444":"#E2E8F0",
+                        textDecoration:m.done?"line-through":"none" }}>{m.name}</div>
+                      <div style={{ fontSize:8,color:"#475569" }}>📅 {m.date}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Row 8: Action buttons ── */}
+        <div style={{ display:"flex",gap:6,marginTop:"auto" }}>
+          {proj.trello&&(
             <a href={proj.trello} target="_blank" rel="noreferrer"
-              style={{ fontSize:9, color:"#00C2D4", textDecoration:"none",
-                background:"rgba(0,194,212,0.1)", border:"1px solid rgba(0,194,212,0.2)",
-                borderRadius:6, padding:"4px 9px", fontWeight:700 }}
-              onClick={e=>e.stopPropagation()}>
+              onClick={e=>e.stopPropagation()}
+              style={{ fontSize:9,color:"#00C2D4",textDecoration:"none",
+                background:"rgba(0,194,212,0.1)",border:"1px solid rgba(0,194,212,0.2)",
+                borderRadius:7,padding:"5px 10px",fontWeight:700 }}>
               🔗 Trello
             </a>
           )}
-          <button onClick={e=>{e.stopPropagation();setDocsModal(proj.id);}}
-            style={{ fontSize:9, color:"#F59E0B", fontWeight:700,
-              background:"rgba(245,158,11,0.1)", border:"1px solid rgba(245,158,11,0.2)",
-              borderRadius:6, padding:"4px 9px", cursor:"pointer" }}>
-            📁 Docs {proj.docs?.length>0?`(${proj.docs.length})`:""}
+          <button onClick={e=>{e.stopPropagation();setExpandMs(v=>v===proj.id?null:proj.id);}}
+            style={{ fontSize:9,color:"#7C3AED",fontWeight:700,
+              background:expandMs===proj.id?"rgba(124,58,237,0.2)":"rgba(124,58,237,0.1)",
+              border:"1px solid rgba(124,58,237,0.2)",borderRadius:7,
+              padding:"5px 10px",cursor:"pointer" }}>
+            🏁 {expandMs===proj.id?"Hide":"Milestones"}
+            {MILESTONES[proj.id]?` (${MILESTONES[proj.id].filter(m=>m.done).length}/${MILESTONES[proj.id].length})`:""}
           </button>
-          
+          <button onClick={e=>{e.stopPropagation();setDocsModal(proj.id);}}
+            style={{ fontSize:9,color:"#F59E0B",fontWeight:700,
+              background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.2)",
+              borderRadius:7,padding:"5px 10px",cursor:"pointer" }}>
+            📁 Docs
+          </button>
+          {currentUser?.role==="executive" && (alert==="overdue"||alert==="atrisk") && proj.email&&(
+            <button onClick={e=>{e.stopPropagation();
+              setAlertSent(true);setTimeout(()=>setAlertSent(false),3000);
+              setAlertModal(proj);}}
+              style={{ marginLeft:"auto",fontSize:9,fontWeight:700,
+                background:alertSent?"rgba(16,185,129,0.15)":"#EF4444",
+                color:alertSent?"#10B981":"#fff",
+                border:"none",borderRadius:7,padding:"5px 12px",cursor:"pointer",
+                transition:"all 0.2s" }}>
+              {alertSent?"✓ Sent":"📧 Alert"}
+            </button>
+          )}
         </div>
       </div>
     );
   };
 
-  // ── EXECUTIVE VIEW ────────────────────────────────────────────────────────
+
   const ExecutiveView = () => {
     const visibleDepts = filterDept === "all"
       ? data.departments
