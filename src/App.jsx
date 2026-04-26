@@ -34,61 +34,54 @@ const USERS = [
 // ── GOOGLE SHEETS CONFIG ──────────────────────────────────────────────────────
 
 
-// ── MILESTONES (from OMP document + Project Tracking) ────────────────────────
-const MILESTONES = {
-  PR08:[ {name:"Pricing model designed",       date:"2026-01-15",done:true },
-         {name:"Pilot in 5 stores",             date:"2026-02-15",done:true },
-         {name:"Full rollout",                  date:"2026-03-31",done:false},
-         {name:"Q2 optimization",               date:"2026-06-30",done:false} ],
-  PR09:[ {name:"Zone mapping completed",        date:"2026-01-20",done:true },
-         {name:"Riyadh pilot re-zoned",         date:"2026-02-20",done:true },
-         {name:"All cities re-zoned",           date:"2026-03-31",done:false},
-         {name:"SLA validation",                date:"2026-06-30",done:false} ],
-  PR05:[ {name:"Framework documented",          date:"2026-01-10",done:true },
-         {name:"First weekly review",           date:"2026-01-17",done:true },
-         {name:"First monthly review",          date:"2026-02-10",done:true },
-         {name:"Full governance live",          date:"2026-03-31",done:false} ],
-  PR35:[ {name:"Freelancer audit complete",     date:"2026-01-08",done:true },
-         {name:"Legal review complete",         date:"2026-01-31",done:false},
-         {name:"30 staff transitioned",         date:"2026-02-28",done:false},
-         {name:"All 85 transitioned",           date:"2026-06-30",done:false} ],
-  PR24:[ {name:"PM schedule drafted",           date:"2026-01-28",done:true },
-         {name:"Contracts signed",              date:"2026-02-15",done:false},
-         {name:"PM in 30 stores",               date:"2026-03-31",done:false},
-         {name:"Full network coverage",         date:"2026-12-31",done:false} ],
-  PR30:[ {name:"Vendor selected",               date:"2026-01-25",done:true },
-         {name:"Pilot in 5 stores",             date:"2026-02-25",done:true },
-         {name:"Rollout to 20 stores",          date:"2026-03-31",done:false},
-         {name:"Full network",                  date:"2026-06-30",done:false} ],
-  PR14:[ {name:"Dev complete",                  date:"2026-01-10",done:true },
-         {name:"UAT passed",                    date:"2026-01-20",done:true },
-         {name:"Live in production",            date:"2026-01-25",done:true },
-         {name:"KPI validated",                 date:"2026-02-01",done:true } ],
-  PR22:[ {name:"Requirements gathered",         date:"2026-01-30",done:true },
-         {name:"Spec done",                      date:"2026-02-28",done:false},
-         {name:"UAT complete",                  date:"2026-04-30",done:false},
-         {name:"Launch",                        date:"2026-06-30",done:false} ],
-  PR10:[ {name:"Pilot in 5 stores",             date:"2026-01-20",done:true },
-         {name:"Expanding to 15 stores",        date:"2026-02-20",done:true },
-         {name:"Full rollout",                  date:"2026-03-31",done:false},
-         {name:"CPO validated",                 date:"2026-06-30",done:false} ],
-  PR13:[ {name:"Team expanded by 15%",          date:"2026-01-12",done:true },
-         {name:"Coverage in 8 stores",          date:"2026-02-12",done:true },
-         {name:"Expand to 5 more stores",       date:"2026-03-31",done:false},
-         {name:"SLA improvement validated",     date:"2026-06-30",done:false} ],
-  PR29:[ {name:"Separator spec finalized",      date:"2026-01-20",done:true },
-         {name:"Installed in 8 stores",         date:"2026-02-25",done:true },
-         {name:"Scale to remaining 22 stores",  date:"2026-03-31",done:false},
-         {name:"Wastage target met",            date:"2026-06-30",done:false} ],
-  PR15:[ {name:"Incentive structure approved",  date:"2026-01-30",done:true },
-         {name:"First 50 referrals received",   date:"2026-02-28",done:false},
-         {name:"Diversity target at 30%",       date:"2026-04-30",done:false},
-         {name:"Target 20% achieved",           date:"2026-12-31",done:false} ],
-  PR39:[ {name:"Data collected from all stores",date:"2026-01-15",done:true },
-         {name:"Benchmarking complete",         date:"2026-01-31",done:true },
-         {name:"Action plans issued",           date:"2026-02-15",done:true },
-         {name:"Savings validated",             date:"2026-03-31",done:true } ],
-};
+
+// ── AUTO PHASES — calculated from project dates ──────────────────────────────
+function getProjectPhases(proj) {
+  if (!proj.startDate || !proj.endDate) return [];
+  const start    = new Date(proj.startDate);
+  const end      = new Date(proj.endDate);
+  const total    = end - start;
+  if (total <= 0) return [];
+  const now      = new Date();
+  const elapsed  = Math.min(now - start, total);
+  const elapsedPct = Math.max(0, elapsed / total);
+
+  const PHASE_NAMES = [
+    { name:"Design & Planning", icon:"📐", from:0,    to:0.25 },
+    { name:"Pilot & Testing",   icon:"🧪", from:0.25, to:0.50 },
+    { name:"Rollout",           icon:"🚀", from:0.50, to:0.75 },
+    { name:"Validation",        icon:"✅", from:0.75, to:1.00 },
+  ];
+
+  return PHASE_NAMES.map((ph, i) => {
+    const phStart = new Date(start.getTime() + ph.from * total);
+    const phEnd   = new Date(start.getTime() + ph.to   * total);
+
+    let status, progress;
+    if (elapsedPct >= ph.to) {
+      status   = "Completed";
+      progress = 100;
+    } else if (elapsedPct >= ph.from) {
+      status   = "In Progress";
+      // How far into this phase?
+      const phElapsed = (now - phStart) / (phEnd - phStart);
+      progress = Math.round(Math.min(Math.max(phElapsed * 100, 0), 99));
+    } else {
+      status   = "Upcoming";
+      progress = 0;
+    }
+
+    return {
+      number:   i + 1,
+      name:     ph.name,
+      icon:     ph.icon,
+      startDate: phStart.toLocaleDateString("en-GB",{day:"2-digit",month:"short"}),
+      endDate:   phEnd.toLocaleDateString("en-GB",{day:"2-digit",month:"short"}),
+      status,
+      progress,
+    };
+  });
+}
 
 // ── PRIMARY KPI MAP — drives project progress calculation ─────────────────────
 const PRIMARY_KPI = {
@@ -301,7 +294,6 @@ export default function App() {
   const [editingActual, setEditingActual] = useState(null);
   const [alertModalProj, setAlertModal]  = useState(null);
   const [docsModal,      setDocsModal]  = useState(null);
-  const [expandMs,       setExpandMs]   = useState(null);
 
   const [localProjects, setProjects] = useState(null);
   const [sheetLoading, setSheetLoading] = useState(true);
@@ -408,74 +400,86 @@ export default function App() {
     return Math.round((end - now) / (1000 * 60 * 60 * 24));
   }
 
-  // ── KPI Actual — from Sheet proj.kpiActual ───────────────────────────────────
-  function getKPIActual(kpiId, projId) {
-    if (projId) {
-      const proj = data.projects.find(p => p.id === projId);
-      if (proj?.kpiActual && proj.kpiActual !== "" && proj.kpiActual !== "—") {
-        const v = parseFloat(String(proj.kpiActual).split("|")[0].trim());
-        if (!isNaN(v)) return v;
+  // ── Parse KPI value from sheet format "K29: 1.55% | K27: 50%" ──────────────
+  function parseKPIValue(raw, kpiId) {
+    if (!raw || raw === "" || raw === "—" || raw === "TBD") return null;
+    const str = String(raw);
+    const segments = str.split("|").map(s => s.trim());
+    for (const seg of segments) {
+      if (kpiId && seg.toUpperCase().includes(kpiId.toUpperCase())) {
+        // Extract number — skip the KNN part
+        const afterColon = seg.includes(":") ? seg.split(":").slice(1).join(":") : seg;
+        const match = afterColon.match(/[\d.]+/);
+        if (match) return parseFloat(match[0]);
       }
     }
-    // fallback to static KPI
+    // No kpiId match — return first number found
+    const match = str.match(/[\d.]+/);
+    return match ? parseFloat(match[0]) : null;
+  }
+
+  // ── KPI Actual — from Sheet KPI_Actual column ────────────────────────────
+  function getKPIActual(kpiId, projId) {
+    const proj = data.projects.find(p => p.id === projId);
+    if (proj?.kpiActual) {
+      const v = parseKPIValue(proj.kpiActual, kpiId);
+      if (v !== null) return v;
+    }
+    // fallback static
     const kpi = data.kpis.find(k => k.id === kpiId);
     return kpi?.actual ?? null;
   }
 
-  // ── KPI Target — from Sheet proj.kpiTarget ────────────────────────────────
-  function getKPITarget(projId) {
+  // ── KPI Target — from Sheet KPI_Target column ────────────────────────────
+  function getKPITarget(kpiId, projId) {
     const proj = data.projects.find(p => p.id === projId);
-    if (proj?.kpiTarget && proj.kpiTarget !== "" && proj.kpiTarget !== "—") {
-      const nums = String(proj.kpiTarget).match(/\d+\.?\d*/g);
-      if (nums) return parseFloat(nums[0]);
+    if (proj?.kpiTarget) {
+      const v = parseKPIValue(proj.kpiTarget, kpiId);
+      if (v !== null) return v;
     }
     return PRIMARY_KPI[projId]?.target ?? null;
   }
 
-  // ── KPI Baseline — from Sheet proj.kpiBaseline ────────────────────────────
-  function getKPIBaseline(projId) {
+  // ── KPI Baseline — from Sheet KPI_Baseline column ────────────────────────
+  function getKPIBaseline(kpiId, projId) {
     const proj = data.projects.find(p => p.id === projId);
-    if (proj?.kpiBaseline && proj.kpiBaseline !== "" && proj.kpiBaseline !== "—") {
-      const v = parseFloat(String(proj.kpiBaseline));
-      if (!isNaN(v)) return v;
+    if (proj?.kpiBaseline) {
+      const v = parseKPIValue(proj.kpiBaseline, kpiId);
+      if (v !== null) return v;
     }
     return PRIMARY_KPI[projId]?.baseline ?? null;
   }
 
-  // ── Progress = (Actual - Baseline) / (Target - Baseline) × 100 ────────────
+  // ── Progress = average of all linked KPIs ────────────────────────────────
+  // (Actual - Baseline) ÷ (Target - Baseline) × 100 per KPI → average
   function getKPIProgress(projId) {
-    const actual   = getKPIActual(PRIMARY_KPI[projId]?.kpi, projId);
-    const target   = getKPITarget(projId);
-    const baseline = getKPIBaseline(projId);
-    const map      = PRIMARY_KPI[projId];
-
-    if (actual === null || target === null || baseline === null) return null;
-    if (baseline === target) return 100;
-
-    const dir = map?.dir || "higher";
-    let prog;
-    if (dir === "higher") {
-      prog = ((actual - baseline) / (target - baseline)) * 100;
-    } else {
-      prog = ((baseline - actual) / (baseline - target)) * 100;
-    }
-    return Math.min(Math.max(Math.round(prog), 0), 100);
-  }
-
-  function getMilestoneProgress(projId) {
-    const ms = MILESTONES[projId];
-    if (!ms || !ms.length) return null;
-    return Math.round((ms.filter(m=>m.done).length / ms.length) * 100);
+    const proj = data.projects.find(p => p.id === projId);
+    if (!proj?.kpis?.length) return null;
+    const results = [];
+    proj.kpis.forEach(kpiId => {
+      const actual   = getKPIActual(kpiId, projId);
+      const target   = getKPITarget(kpiId, projId);
+      const baseline = getKPIBaseline(kpiId, projId);
+      if (actual === null || target === null || baseline === null) return;
+      if (baseline === target) { results.push(100); return; }
+      const map = PRIMARY_KPI[projId];
+      const dir = map?.dir || "higher";
+      let prog;
+      if (dir === "higher") {
+        prog = ((actual - baseline) / (target - baseline)) * 100;
+      } else {
+        prog = ((baseline - actual) / (baseline - target)) * 100;
+      }
+      results.push(Math.min(Math.max(prog, 0), 100));
+    });
+    if (!results.length) return null;
+    return Math.round(results.reduce((a,b)=>a+b,0) / results.length);
   }
 
   function getProjProgress(projId) {
-    // 1st: KPI-based progress (most objective)
+    // KPI-based progress (from sheet data)
     const kpiProg = getKPIProgress(projId);
     if (kpiProg !== null) return kpiProg;
-    // 2nd: Milestone completion %
-    const msProg = getMilestoneProgress(projId);
-    if (msProg !== null) return msProg;
-    // 3rd: manual
     return null;
   }
 
@@ -931,13 +935,13 @@ export default function App() {
               <div>
                 <div style={{ fontSize:8,color:"#64748B",marginBottom:2 }}>Current</div>
                 <div style={{ fontSize:20,fontWeight:800,color:alertC.color,lineHeight:1 }}>
-                  {getKPIActual(map.kpi, proj.id) ?? "—"} {map.unit}
+                  {getKPIActual(map?.kpi, proj.id) ?? "—"} {map?.unit ?? ""}
                 </div>
               </div>
               <div style={{ textAlign:"right" }}>
                 <div style={{ fontSize:8,color:"#64748B",marginBottom:2 }}>Target</div>
                 <div style={{ fontSize:15,fontWeight:700,color:"#64748B" }}>
-                  {(getKPITarget(proj.id) ?? map.target)} {map.unit}
+                  {getKPITarget(map?.kpi, proj.id) ?? map?.target ?? "—"} {map?.unit ?? ""}
                 </div>
               </div>
             </div>
@@ -948,7 +952,7 @@ export default function App() {
                 transition:"width 1s ease" }}/>
             </div>
             <div style={{ display:"flex",justifyContent:"space-between",marginTop:4,fontSize:8,color:"#334155" }}>
-              <span>Baseline: {getKPIBaseline(proj.id) ?? map?.baseline ?? "—"} {map?.unit}</span>
+              <span>Baseline: {getKPIBaseline(map?.kpi, proj.id) ?? map?.baseline ?? "—"} {map?.unit ?? ""}</span>
               <span style={{ fontWeight:700,color:alertC.color }}>
                 {getKPIProgress(proj.id) ?? calcProg}%
               </span>
@@ -1033,35 +1037,71 @@ export default function App() {
           </button>
         )}
 
-        {/* ── Row 7: Milestones inline ── */}
-        {expandMs===proj.id && MILESTONES[proj.id] && (
-          <div style={{ marginBottom:12,borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:10 }}
-            onClick={e=>e.stopPropagation()}>
-            <div style={{ position:"relative",paddingLeft:16 }}>
-              <div style={{ position:"absolute",left:6,top:4,bottom:4,width:1.5,
-                background:"rgba(124,58,237,0.25)",borderRadius:99 }}/>
-              {MILESTONES[proj.id].map((m,i)=>{
-                const dl=Math.round((new Date(m.date)-new Date())/(1000*60*60*24));
-                return (
-                  <div key={i} style={{ display:"flex",alignItems:"flex-start",gap:8,marginBottom:7,position:"relative" }}>
-                    <div style={{ width:11,height:11,borderRadius:"50%",flexShrink:0,
-                      position:"absolute",left:-11,top:2,
-                      background:m.done?"#10B981":dl<0?"#EF4444":"rgba(255,255,255,0.1)",
-                      border:`1.5px solid ${m.done?"#10B981":dl<0?"#EF4444":"rgba(255,255,255,0.2)"}`,
-                      display:"flex",alignItems:"center",justifyContent:"center",
-                      fontSize:6,color:"#fff",fontWeight:900 }}>{m.done?"✓":""}</div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:10,fontWeight:600,
-                        color:m.done?"#64748B":dl<0?"#EF4444":"#E2E8F0",
-                        textDecoration:m.done?"line-through":"none" }}>{m.name}</div>
-                      <div style={{ fontSize:8,color:"#475569" }}>📅 {m.date}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* ── Row 7: Phases ── */}
+        {(()=>{
+          const [showPhases, setShowPhases] = useState(false);
+          const phases = getProjectPhases(proj);
+          const doneCount = phases.filter(p=>p.status==="Completed").length;
+          const currentPhase = phases.find(p=>p.status==="In Progress");
+          return (
+            <>
+              <button onClick={e=>{e.stopPropagation();setShowPhases(v=>!v);}}
+                style={{ fontSize:9,color:"#7C3AED",fontWeight:700,
+                  background:showPhases?"rgba(124,58,237,0.2)":"rgba(124,58,237,0.1)",
+                  border:"1px solid rgba(124,58,237,0.2)",borderRadius:7,
+                  padding:"5px 10px",cursor:"pointer",
+                  display:"flex",alignItems:"center",gap:5 }}>
+                📋 {showPhases?"Hide":"Phases"}
+                <span style={{ background:"rgba(124,58,237,0.3)",borderRadius:99,
+                  padding:"1px 5px" }}>{doneCount}/4</span>
+              </button>
+              {showPhases && (
+                <div style={{ marginTop:10,borderTop:"1px solid rgba(255,255,255,0.06)",
+                  paddingTop:10,gridColumn:"1/-1" }}
+                  onClick={e=>e.stopPropagation()}>
+                  {phases.map((ph,i)=>{
+                    const isActive = ph.status==="In Progress";
+                    const isDone   = ph.status==="Completed";
+                    const color    = isDone?"#10B981":isActive?"#00C2D4":"#334155";
+                    return (
+                      <div key={i} style={{ marginBottom:10 }}>
+                        <div style={{ display:"flex",alignItems:"center",
+                          justifyContent:"space-between",marginBottom:4 }}>
+                          <div style={{ display:"flex",alignItems:"center",gap:6 }}>
+                            <span style={{ fontSize:12 }}>{ph.icon}</span>
+                            <span style={{ fontSize:10,fontWeight:700,color }}>
+                              Phase {ph.number}: {ph.name}
+                            </span>
+                            <span style={{ fontSize:8,
+                              color:isDone?"#10B981":isActive?"#00C2D4":"#475569",
+                              background:isDone?"rgba(16,185,129,0.1)":isActive?"rgba(0,194,212,0.1)":"rgba(255,255,255,0.04)",
+                              borderRadius:99,padding:"1px 6px" }}>
+                              {ph.status}
+                            </span>
+                          </div>
+                          <span style={{ fontSize:10,fontWeight:800,color }}>
+                            {ph.progress}%
+                          </span>
+                        </div>
+                        <div style={{ display:"flex",alignItems:"center",gap:6 }}>
+                          <div style={{ flex:1,height:5,borderRadius:99,
+                            background:"rgba(255,255,255,0.06)",overflow:"hidden" }}>
+                            <div style={{ width:`${ph.progress}%`,height:"100%",
+                              background:isDone?"#10B981":isActive?"#00C2D4":"#334155",
+                              borderRadius:99,transition:"width 0.8s ease" }}/>
+                          </div>
+                          <span style={{ fontSize:8,color:"#334155",whiteSpace:"nowrap" }}>
+                            {ph.startDate} → {ph.endDate}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* ── Row 8: Action buttons ── */}
         <div style={{ display:"flex",gap:6,marginTop:"auto" }}>
@@ -1074,14 +1114,7 @@ export default function App() {
               🔗 Trello
             </a>
           )}
-          <button onClick={e=>{e.stopPropagation();setExpandMs(v=>v===proj.id?null:proj.id);}}
-            style={{ fontSize:9,color:"#7C3AED",fontWeight:700,
-              background:expandMs===proj.id?"rgba(124,58,237,0.2)":"rgba(124,58,237,0.1)",
-              border:"1px solid rgba(124,58,237,0.2)",borderRadius:7,
-              padding:"5px 10px",cursor:"pointer" }}>
-            🏁 {expandMs===proj.id?"Hide":"Milestones"}
-            {MILESTONES[proj.id]?` (${MILESTONES[proj.id].filter(m=>m.done).length}/${MILESTONES[proj.id].length})`:""}
-          </button>
+
           <button onClick={e=>{e.stopPropagation();setDocsModal(proj.id);}}
             style={{ fontSize:9,color:"#F59E0B",fontWeight:700,
               background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.2)",
